@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ESP32-CAM Stream</title>
+    <div style="margin-top: 20px;">
+        <button onclick="toggleLight('LIGAR_FLASH')" style="padding: 10px; background: orange;">Ligar Flash</button>
+        <button onclick="toggleLight('DESLIGAR_FLASH')" style="padding: 10px;">Desligar Flash</button>
+        <button onclick="toggleLed()" style="padding: 10px;">Desligar Flash</button>
+    </div>
+    <style>
+        body { font-family: sans-serif; text-align: center; background: #222; color: white; }
+        #stream { max-width: 100%; border: 5px solid #444; border-radius: 8px; margin-top: 20px; }
+        .status { margin: 10px; padding: 10px; font-weight: bold; }
+        .connected { color: #4CAF50; }
+        .disconnected { color: #f44336; }
+    </style>
+</head>
+<body>
+
+    <h2>Streaming WebSocket ESP32-CAM</h2>
+    <div id="status" class="status disconnected">Desconectado</div>
+    
+    <img id="stream" src="" alt="Aguardando stream...">
+
+    <script>
+        // Substitua pelo IP que aparece no Serial Monitor do seu ESP32
+        const gateway = `ws://192.168.0.109/ws`; 
+        let websocket;
+        const streamImg = document.getElementById('stream');
+        const statusDiv = document.getElementById('status');
+
+        let ledState = 0;
+
+        function initWebSocket() {
+            console.log('Tentando abrir conexão WebSocket...');
+            websocket = new WebSocket(gateway);
+            
+            // Define o tipo de dado como blob (binário para o JPEG)
+            websocket.binaryType = "blob";
+
+            websocket.onopen = () => {
+                statusDiv.innerText = "Conectado";
+                statusDiv.className = "status connected";
+            };
+
+            websocket.onclose = () => {
+                statusDiv.innerText = "Desconectado - Tentando reconectar...";
+                statusDiv.className = "status disconnected";
+                setTimeout(initWebSocket, 2000);
+            };
+
+            websocket.onmessage = (event) => {
+                // event.data contém o frame binário enviado pelo ESP32
+                if (event.data instanceof Blob) {
+                    // Cria uma URL temporária para o Blob recebido
+                    const url = URL.createObjectURL(event.data);
+                    
+                    // Substitui a imagem anterior pela nova
+                    const oldUrl = streamImg.src;
+                    streamImg.src = url;
+
+                    // Limpa a URL antiga da memória para evitar travamento do navegador
+                    if (oldUrl.startsWith('blob:')) {
+                        URL.revokeObjectURL(oldUrl);
+                    }
+                }
+            };
+        }
+        
+        function toggleLight(comando) {
+            if (websocket.readyState === WebSocket.OPEN) {
+                websocket.send(comando);
+            }
+        }
+
+        function toggleLed(){
+            if (websocket.readyState === websocket.OPEN){
+               
+                if(ledState === 0)
+                {
+                  websocket.send("LIGAR_LED");
+                  ledState = 1;
+                }
+                
+                if (ledState === 1)
+                {
+                    websocket.send("DESLIGAR_LED");
+                    ledState = 0;
+                }
+            }
+        }
+
+        window.onload = initWebSocket;
+    </script>
+</body>
+</html>

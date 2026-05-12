@@ -1,18 +1,51 @@
 #include <Arduino.h>
+#include <WiFi.h>
+#include "camera/Camera.h"
+#include "network/Websocket.h"
 
-// put function declarations here:
-int myFunction(int, int);
+const char* ssid = "Zelma";
+const char* password = "luiz246810";
+
+Camera cam;
+NetworkManager net;
+
+unsigned long lastMillis = 0;
+const int interval = 100; // 10 FPS
 
 void setup() {
-  // put your setup code here, to run once:
-  int result = myFunction(2, 3);
+    Serial.begin(115200);
+    
+    WiFi.begin(ssid, password);
+    
+    while (WiFi.status() != WL_CONNECTED) 
+    {
+      Serial.println("TENTANDO CONECTAR NO WIFI....");
+      delay(500);
+    };
+
+    Serial.println(WiFi.localIP());
+
+    if (!cam.init()) {
+        Serial.println("Erro na Câmera!");
+        ESP.restart();
+    }
+
+    net.init();
 }
 
 void loop() {
-  // put your main code here, to run repeatedly:
-}
+    net.cleanup();
 
-// put function definitions here:
-int myFunction(int x, int y) {
-  return x + y;
+    if (millis() - lastMillis >= interval) 
+    {
+        lastMillis = millis();
+
+        if (net.getClientCount() > 0) {
+            camera_fb_t* fb = cam.getFrame();
+            if (fb) {
+                net.sendFrame(fb);
+                cam.freeBuffer(fb);
+            }
+        }
+    }
 }
