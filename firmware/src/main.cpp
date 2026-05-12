@@ -2,12 +2,14 @@
 #include <WiFi.h>
 #include "camera/Camera.h"
 #include "network/Websocket.h"
+#include "network/Request.h"
 
 const char* ssid = "Zelma";
 const char* password = "luiz246810";
 
 Camera cam;
 NetworkManager net;
+Request req;
 
 unsigned long lastMillis = 0;
 const int interval = 100; // 10 FPS
@@ -23,7 +25,8 @@ void setup() {
       delay(500);
     };
 
-    Serial.println(WiFi.localIP());
+    Serial.println("Enviando REQUEST para API; Inicio de conversa WEBSOCKET");
+    req.sendIp();
 
     if (!cam.init()) {
         Serial.println("Erro na Câmera!");
