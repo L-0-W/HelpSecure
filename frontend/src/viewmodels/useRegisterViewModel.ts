@@ -50,7 +50,6 @@ export const useRegisterViewModel = (props?: RegisterViewModelProps) => {
       const data = await response.json();
 
       if (response.ok) {
-        // Você poderia salvar o data.token aqui (ex: AsyncStorage)
         if (props?.navigateToHome) {
           props.navigateToHome();
         }

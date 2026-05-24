@@ -30,12 +30,10 @@ export function useNovoVisitanteViewModel() {
     }, []);
 
     const handleSalvar = useCallback(() => {
-        // Lógica futura de salvar
         console.log('Salvar:', visitante);
     }, [visitante]);
 
     const handleRevogar = useCallback(() => {
-        // Lógica futura de revogar
         console.log('Revogar');
     }, []);
 

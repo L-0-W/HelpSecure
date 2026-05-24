@@ -61,7 +61,6 @@ export const useLoginViewModel = (props?: LoginViewModelProps) => {
   };
 
   const onBiometricLogin = async () => {
-    // Aqui entraria a integração com expo-local-authentication
     const hasHardware = await LocalAuthentication.hasHardwareAsync();
     if (hasHardware) {
       const isEnrolled = await LocalAuthentication.isEnrolledAsync();
@@ -87,7 +86,6 @@ export const useLoginViewModel = (props?: LoginViewModelProps) => {
   };
 
   const onForgotPassword = () => {
-    // Redirecionamento para a tela de esqueci a senha
     Alert.alert('Esqueci a Senha', 'Redirecionando...');
   };
 
