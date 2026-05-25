@@ -1,4 +1,3 @@
-// src/views/LocalView.tsx
 import React, { useEffect } from 'react';
 import {
     View,
@@ -53,7 +52,6 @@ export default function LocalView() {
         );
     };
 
-    // Render Form Screen (Create/Edit)
     if (vm.telaAtiva === 'cadastro' || vm.telaAtiva === 'edicao') {
         const isEditing = vm.telaAtiva === 'edicao';
         return (
@@ -150,7 +148,6 @@ export default function LocalView() {
         );
     }
 
-    // Render List Screen
     return (
         <View style={styles.container}>
             {/* Título e Subtítulo */}
@@ -214,7 +211,6 @@ export default function LocalView() {
     );
 }
 
-// Local Card Component
 function LocalCard({
     local,
     onEdit,

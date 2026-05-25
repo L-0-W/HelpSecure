@@ -1,4 +1,3 @@
-// src/viewmodels/useNovoVisitanteViewModel.ts
 import { useState, useCallback, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -8,12 +7,11 @@ export function useNovoVisitanteViewModel(selectedVisitante?: any, onSaveSuccess
     const [validade, setValidade] = useState<string | null>(selectedVisitante?.validade || null);
     const [fotoUri, setFotoUri] = useState<string | null>(selectedVisitante?.fotoUri || null);
     const [faceImageBytes, setFaceImageBytes] = useState<number[] | null>(selectedVisitante?.face_image_bytes || null);
-    
+
     const [locais, setLocais] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    // Carrega a lista de locais cadastrados pelo usuário logado
     const carregarLocais = useCallback(async () => {
         try {
             const token = await AsyncStorage.getItem('token');

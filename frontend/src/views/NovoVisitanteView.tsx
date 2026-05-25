@@ -1,4 +1,3 @@
-// src/screens/NovoVisitante/NovoVisitanteView.tsx
 import React, { useState, useRef } from 'react';
 import {
     View,
@@ -17,7 +16,6 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useNovoVisitanteViewModel } from '../viewmodels/useNovoVisitanteViewModel';
 
-// Cores do tema escuro
 const COLORS = {
     background: '#121214',
     surface: '#1C1C1E',
@@ -32,14 +30,13 @@ const COLORS = {
     success: '#81C995',
 };
 
-// Conversor robusto de base64 para array de bytes pura em JavaScript
 const base64ToByteArray = (base64String: string): number[] => {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
     const lookup = new Uint8Array(256);
     for (let i = 0; i < chars.length; i++) {
         lookup[chars.charCodeAt(i)] = i;
     }
-    
+
     const len = base64String.length;
     let p = 0;
     if (base64String[len - 1] === '=') {
@@ -48,18 +45,18 @@ const base64ToByteArray = (base64String: string): number[] => {
             p++;
         }
     }
-    
+
     const bytes = new Uint8Array(Math.floor(len * 0.75) - p);
     let bytesIdx = 0;
-    
+
     for (let i = 0; i < len; i += 4) {
         const encoded1 = lookup[base64String.charCodeAt(i)];
         const encoded2 = lookup[base64String.charCodeAt(i + 1)];
         const encoded3 = lookup[base64String.charCodeAt(i + 2)];
         const encoded4 = lookup[base64String.charCodeAt(i + 3)];
-        
+
         const bytesVal = (encoded1 << 18) | (encoded2 << 12) | (encoded3 << 6) | encoded4;
-        
+
         bytes[bytesIdx++] = (bytesVal >> 16) & 255;
         if (bytesIdx < bytes.length) {
             bytes[bytesIdx++] = (bytesVal >> 8) & 255;
@@ -80,7 +77,7 @@ export default function NovoVisitanteView({
 }) {
     const isEditing = !!visitante;
     const vm = useNovoVisitanteViewModel(visitante, onVoltar);
-    
+
     const [cameraActive, setCameraActive] = useState(false);
     const [showDatePicker, setShowDatePicker] = useState(false);
     const cameraRef = useRef<any>(null);
@@ -150,19 +147,18 @@ export default function NovoVisitanteView({
         );
     }
 
-    // Tradução de datas personalizadas para exibição amigável
     const getValidadeLabel = () => {
         if (!vm.validade) return 'Selecione';
         if (vm.validade === '1h') return '1 Hora';
         if (vm.validade === '4h') return '4 Horas';
         if (vm.validade === '1dia') return '1 Dia';
-        
+
         try {
             const date = new Date(vm.validade);
             if (!isNaN(date.getTime())) {
                 return date.toLocaleDateString('pt-BR');
             }
-        } catch (_) {}
+        } catch (_) { }
         return vm.validade;
     };
 
@@ -184,7 +180,7 @@ export default function NovoVisitanteView({
                         {isEditing ? 'Editar Acesso' : 'Novo Visitante'}
                     </Text>
                     <Text style={styles.subtitle}>
-                        {isEditing 
+                        {isEditing
                             ? 'Atualize os dados de autorização de acesso.'
                             : 'Preencha os dados para autorizar o acesso.'
                         }
@@ -347,7 +343,6 @@ export default function NovoVisitanteView({
     );
 }
 
-// Sub-componente: Botão de Local
 function LocalButton({
     icon,
     label,
@@ -385,7 +380,6 @@ function LocalButton({
     );
 }
 
-// Sub-componente: Botão de Validade
 function ValidadeButton({
     label,
     icon,

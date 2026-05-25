@@ -1,4 +1,3 @@
-// src/screens/Home/ListaVisitantesView.tsx
 import React, { useEffect, useState } from 'react';
 import {
     View,
@@ -36,7 +35,6 @@ export default function ListaVisitantesView() {
         vm.listarVisitantes();
     }, [vm.listarVisitantes]);
 
-    // Carrega locais para mapear nomes na listagem
     useEffect(() => {
         const carregarLocais = async () => {
             try {
@@ -77,7 +75,6 @@ export default function ListaVisitantesView() {
         );
     };
 
-    // Renderiza a tela ativa (lista, cadastro ou edicao)
     if (vm.telaAtiva === 'cadastro' || vm.telaAtiva === 'edicao') {
         return (
             <NovoVisitanteView
@@ -170,7 +167,6 @@ export default function ListaVisitantesView() {
     );
 }
 
-// Card de Visitante
 function VisitanteCard({
     visitante,
     onEdit,
@@ -237,7 +233,6 @@ function VisitanteCard({
     );
 }
 
-// Botão de Filtro
 function FiltroButton({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
     return (
         <TouchableOpacity

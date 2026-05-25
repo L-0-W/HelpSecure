@@ -1,4 +1,3 @@
-// src/viewmodels/useLocalViewModel.ts
 import { useState, useCallback } from 'react';
 import { Local } from '../models/local';
 import { Alert } from 'react-native';
@@ -57,7 +56,7 @@ export function useLocalViewModel() {
 
             const data = await response.json();
             console.log(data);
-            
+
             if (data && Array.isArray(data)) {
                 setLocais(data);
             } else if (data && data.locais && Array.isArray(data.locais)) {
@@ -99,7 +98,6 @@ export function useLocalViewModel() {
                 throw new Error(data.error || 'Erro ao salvar local');
             }
 
-            // Recarregar a lista e voltar
             await listarLocais();
             voltarParaLista();
         } catch (err: any) {

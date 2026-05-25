@@ -1,4 +1,3 @@
-// src/viewmodels/useVisitantesListViewModel.ts
 import { useState, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Alert } from 'react-native';
@@ -86,7 +85,6 @@ export function useListaVisitantesViewModel() {
         }
     }, [listarVisitantes]);
 
-    // Filtragem local
     const visitantesFiltrados = visitantes.filter((v) => {
         const status = v.status || 'ativo';
         if (filtro === 'ativos') return status === 'ativo';
