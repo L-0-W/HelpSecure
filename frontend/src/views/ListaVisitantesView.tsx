@@ -1,15 +1,17 @@
 // src/screens/Home/ListaVisitantesView.tsx
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
     View,
     Text,
     TouchableOpacity,
     FlatList,
     StyleSheet,
+    Alert,
+    ActivityIndicator,
 } from 'react-native';
-import { Ionicons, MaterialIcons } from '@expo/vector-icons';
+import { Ionicons, MaterialIcons, Feather } from '@expo/vector-icons';
 import { useListaVisitantesViewModel } from '../viewmodels/useVisitantesListViewModel';
-import { Visitante } from '../models/visitantes';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import NovoVisitanteView from './NovoVisitanteView';
 
 const COLORS = {
@@ -28,15 +30,58 @@ const COLORS = {
 
 export default function ListaVisitantesView() {
     const vm = useListaVisitantesViewModel();
+    const [locaisList, setLocaisList] = useState<any[]>([]);
 
     useEffect(() => {
         vm.listarVisitantes();
-    }, [vm]);
+    }, [vm.listarVisitantes]);
 
-    // Renderiza a tela ativa (lista ou cadastro)
-    if (vm.telaAtiva === 'cadastro') {
+    // Carrega locais para mapear nomes na listagem
+    useEffect(() => {
+        const carregarLocais = async () => {
+            try {
+                const token = await AsyncStorage.getItem('token');
+                const response = await fetch('https://api-robotica-movel.onrender.com/locais', {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                    },
+                });
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data && Array.isArray(data)) {
+                        setLocaisList(data);
+                    } else if (data && data.locais && Array.isArray(data.locais)) {
+                        setLocaisList(data.locais);
+                    }
+                }
+            } catch (e) {
+                console.error('Erro ao buscar locais:', e);
+            }
+        };
+        carregarLocais();
+    }, [vm.telaAtiva]);
+
+    const handleDeletePress = (visitante: any) => {
+        Alert.alert(
+            'Confirmar Exclusão',
+            `Deseja realmente excluir a autorização de acesso para "${visitante.nome}"?`,
+            [
+                { text: 'Cancelar', style: 'cancel' },
+                {
+                    text: 'Excluir',
+                    style: 'destructive',
+                    onPress: () => vm.deletarVisitante(visitante.id),
+                },
+            ]
+        );
+    };
+
+    // Renderiza a tela ativa (lista, cadastro ou edicao)
+    if (vm.telaAtiva === 'cadastro' || vm.telaAtiva === 'edicao') {
         return (
             <NovoVisitanteView
+                visitante={vm.selectedVisitante}
                 onVoltar={vm.voltarParaLista}
             />
         );
@@ -71,14 +116,47 @@ export default function ListaVisitantesView() {
                 />
             </View>
 
-            {/* Lista */}
-            <FlatList
-                data={vm.visitantes}
-                keyExtractor={(item) => item.id}
-                renderItem={({ item }) => <VisitanteCard visitante={item} />}
-                contentContainerStyle={styles.listContent}
-                showsVerticalScrollIndicator={false}
-            />
+            {/* Loading / List Content */}
+            {vm.isLoading && vm.visitantes.length === 0 ? (
+                <View style={styles.centerContainer}>
+                    <ActivityIndicator size="large" color={COLORS.primary} />
+                </View>
+            ) : vm.visitantes.length === 0 ? (
+                <View style={styles.centerContainer}>
+                    <View style={styles.emptyIconContainer}>
+                        <Ionicons name="people-outline" size={48} color={COLORS.textMuted} />
+                    </View>
+                    <Text style={styles.emptyTitle}>Nenhum visitante encontrado</Text>
+                    <Text style={styles.emptySubtitle}>
+                        Toque no botão "+" abaixo para registrar o primeiro acesso.
+                    </Text>
+                    <TouchableOpacity
+                        style={styles.emptyButton}
+                        onPress={vm.listarVisitantes}
+                        activeOpacity={0.8}
+                    >
+                        <Ionicons name="refresh" size={16} color={COLORS.primary} />
+                        <Text style={styles.emptyButtonText}>Recarregar</Text>
+                    </TouchableOpacity>
+                </View>
+            ) : (
+                <FlatList
+                    data={vm.visitantes}
+                    keyExtractor={(item) => item.id.toString()}
+                    renderItem={({ item }) => (
+                        <VisitanteCard
+                            visitante={item}
+                            onEdit={() => vm.navegarParaEdicao(item)}
+                            onDelete={() => handleDeletePress(item)}
+                            locais={locaisList}
+                        />
+                    )}
+                    contentContainerStyle={styles.listContent}
+                    showsVerticalScrollIndicator={false}
+                    refreshing={vm.isLoading}
+                    onRefresh={vm.listarVisitantes}
+                />
+            )}
 
             {/* FAB */}
             <TouchableOpacity
@@ -93,29 +171,40 @@ export default function ListaVisitantesView() {
 }
 
 // Card de Visitante
-function VisitanteCard({ visitante }: { visitante: Visitante }) {
+function VisitanteCard({
+    visitante,
+    onEdit,
+    onDelete,
+    locais,
+}: {
+    visitante: any;
+    onEdit: () => void;
+    onDelete: () => void;
+    locais: any[];
+}) {
+    const statusVal = visitante.status || 'ativo';
     const statusConfig = {
         ativo: { color: COLORS.success, label: 'Ativo', icon: 'check-circle' as const },
         expirado: { color: COLORS.warning, label: 'Expirado', icon: 'access-time' as const },
         revogado: { color: COLORS.danger, label: 'Revogado', icon: 'cancel' as const },
     };
 
-    const status = statusConfig[visitante.status];
+    const status = statusConfig[statusVal as keyof typeof statusConfig] || statusConfig.ativo;
+    const localRelacionado = locais.find((l) => l.id === visitante.local_id);
+    const localNome = localRelacionado ? localRelacionado.nome : 'Sem Local Relacionado';
 
     return (
         <View style={styles.card}>
             <View style={styles.cardLeft}>
                 <View style={styles.cardAvatar}>
-                    <Ionicons name="person" size={24} color={COLORS.textMuted} />
+                    <Ionicons name="person" size={20} color={COLORS.primary} />
                 </View>
                 <View style={styles.cardInfo}>
                     <Text style={styles.cardNome}>{visitante.nome}</Text>
                     <View style={styles.cardMeta}>
                         <MaterialIcons name="place" size={12} color={COLORS.textSecondary} />
-                        <Text style={styles.cardMetaText}>
-                            {visitante.localAcesso === 'portaria' && 'Portaria Principal'}
-                            {visitante.localAcesso === 'garagem' && 'Garagem Subsolo'}
-                            {visitante.localAcesso === 'administrativo' && 'Bloco Administrativo'}
+                        <Text style={styles.cardMetaText} numberOfLines={1}>
+                            {localNome}
                         </Text>
                     </View>
                 </View>
@@ -127,9 +216,22 @@ function VisitanteCard({ visitante }: { visitante: Visitante }) {
                         {status.label}
                     </Text>
                 </View>
-                <TouchableOpacity style={styles.cardMore}>
-                    <Ionicons name="ellipsis-vertical" size={16} color={COLORS.textSecondary} />
-                </TouchableOpacity>
+                <View style={styles.cardActions}>
+                    <TouchableOpacity
+                        style={styles.actionIconButton}
+                        onPress={onEdit}
+                        activeOpacity={0.7}
+                    >
+                        <Feather name="edit-2" size={16} color={COLORS.primary} />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={styles.actionIconButton}
+                        onPress={onDelete}
+                        activeOpacity={0.7}
+                    >
+                        <Feather name="trash-2" size={16} color={COLORS.danger} />
+                    </TouchableOpacity>
+                </View>
             </View>
         </View>
     );
@@ -202,6 +304,52 @@ const styles = StyleSheet.create({
         paddingBottom: 100,
         gap: 10,
     },
+    centerContainer: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: 32,
+        paddingBottom: 80,
+    },
+    emptyIconContainer: {
+        width: 80,
+        height: 80,
+        borderRadius: 40,
+        backgroundColor: COLORS.surface,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 16,
+        borderWidth: 1,
+        borderColor: COLORS.border,
+    },
+    emptyTitle: {
+        fontSize: 18,
+        fontWeight: '600',
+        color: COLORS.text,
+        marginBottom: 8,
+    },
+    emptySubtitle: {
+        fontSize: 14,
+        color: COLORS.textSecondary,
+        textAlign: 'center',
+        lineHeight: 20,
+        marginBottom: 24,
+    },
+    emptyButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        paddingHorizontal: 20,
+        paddingVertical: 12,
+        borderRadius: 24,
+        borderWidth: 1,
+        borderColor: COLORS.primary,
+    },
+    emptyButtonText: {
+        color: COLORS.primary,
+        fontSize: 14,
+        fontWeight: '600',
+    },
     card: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -229,6 +377,7 @@ const styles = StyleSheet.create({
     },
     cardInfo: {
         gap: 4,
+        flex: 1,
     },
     cardNome: {
         color: COLORS.text,
@@ -243,10 +392,11 @@ const styles = StyleSheet.create({
     cardMetaText: {
         color: COLORS.textSecondary,
         fontSize: 12,
+        flex: 1,
     },
     cardRight: {
         alignItems: 'flex-end',
-        gap: 8,
+        gap: 10,
     },
     statusBadge: {
         flexDirection: 'row',
@@ -260,8 +410,18 @@ const styles = StyleSheet.create({
         fontSize: 11,
         fontWeight: '500',
     },
-    cardMore: {
-        padding: 4,
+    cardActions: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+    },
+    actionIconButton: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: COLORS.surfaceLight,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     fab: {
         position: 'absolute',

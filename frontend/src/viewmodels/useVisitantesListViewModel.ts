@@ -1,56 +1,29 @@
-// src/viewmodels/useListaVisitantesViewModel.ts
+// src/viewmodels/useVisitantesListViewModel.ts
 import { useState, useCallback } from 'react';
-import { Visitante } from '../models/visitantes';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Alert } from 'react-native';
 
-const MOCK_VISITANTES: Visitante[] = [
-    {
-        id: '1',
-        nome: 'Carlos Eduardo',
-        fotoUri: null,
-        localAcesso: 'portaria',
-        validade: '4h',
-        dataCriacao: new Date(),
-        status: 'ativo',
-    },
-    {
-        id: '2',
-        nome: 'Maria Fernanda',
-        fotoUri: null,
-        localAcesso: 'garagem',
-        validade: '1dia',
-        dataCriacao: new Date(),
-        status: 'ativo',
-    },
-    {
-        id: '3',
-        nome: 'João Pedro',
-        fotoUri: null,
-        localAcesso: 'administrativo',
-        validade: '1h',
-        dataCriacao: new Date(),
-        status: 'expirado',
-    },
-];
-
-type Tela = 'lista' | 'cadastro';
+type Tela = 'lista' | 'cadastro' | 'edicao';
 
 export function useListaVisitantesViewModel() {
     const [telaAtiva, setTelaAtiva] = useState<Tela>('lista');
-    const [visitantes, setVisitantes] = useState<Visitante[]>(MOCK_VISITANTES);
+    const [visitantes, setVisitantes] = useState<any[]>([]);
+    const [selectedVisitante, setSelectedVisitante] = useState<any | null>(null);
     const [filtro, setFiltro] = useState<'todos' | 'ativos' | 'expirados'>('todos');
-
-    const visitantesFiltrados = visitantes.filter((v) => {
-        if (filtro === 'ativos') return v.status === 'ativo';
-        if (filtro === 'expirados') return v.status === 'expirado' || v.status === 'revogado';
-        return true;
-    });
+    const [isLoading, setIsLoading] = useState(false);
 
     const navegarParaCadastro = useCallback(() => {
+        setSelectedVisitante(null);
         setTelaAtiva('cadastro');
     }, []);
 
+    const navegarParaEdicao = useCallback((visitante: any) => {
+        setSelectedVisitante(visitante);
+        setTelaAtiva('edicao');
+    }, []);
+
     const voltarParaLista = useCallback(() => {
-        console.log("Voltar para lista")
+        setSelectedVisitante(null);
         setTelaAtiva('lista');
     }, []);
 
@@ -59,24 +32,79 @@ export function useListaVisitantesViewModel() {
     }, []);
 
     const listarVisitantes = useCallback(async () => {
-        const response = await fetch('https://api-robotica-movel.onrender.com/visitantes', {
-            method: 'GET',
-            headers: {
-                'Authorization': `Bearer ${localStorage.getItem('token')}`,
-            },
-        });
+        setIsLoading(true);
+        try {
+            const token = await AsyncStorage.getItem('token');
+            const response = await fetch('https://api-robotica-movel.onrender.com/visitantes', {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                },
+            });
 
-        const data = await response.json();
-        setVisitantes(data);
+            if (response.ok) {
+                const data = await response.json();
+                if (data && Array.isArray(data)) {
+                    setVisitantes(data);
+                } else if (data && data.visitantes && Array.isArray(data.visitantes)) {
+                    setVisitantes(data.visitantes);
+                } else {
+                    setVisitantes([]);
+                }
+            } else {
+                setVisitantes([]);
+            }
+        } catch (e) {
+            console.error('Erro ao listar visitantes:', e);
+            setVisitantes([]);
+        } finally {
+            setIsLoading(false);
+        }
     }, []);
+
+    const deletarVisitante = useCallback(async (id: number) => {
+        setIsLoading(true);
+        try {
+            const token = await AsyncStorage.getItem('token');
+            const response = await fetch(`https://api-robotica-movel.onrender.com/visitantes/${id}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                },
+            });
+
+            if (!response.ok) {
+                const data = await response.json().catch(() => ({}));
+                throw new Error(data.error || 'Erro ao excluir visitante');
+            }
+
+            await listarVisitantes();
+        } catch (err: any) {
+            Alert.alert('Erro', err.message || 'Não foi possível excluir o visitante.');
+        } finally {
+            setIsLoading(false);
+        }
+    }, [listarVisitantes]);
+
+    // Filtragem local
+    const visitantesFiltrados = visitantes.filter((v) => {
+        const status = v.status || 'ativo';
+        if (filtro === 'ativos') return status === 'ativo';
+        if (filtro === 'expirados') return status === 'expirado' || status === 'revogado';
+        return true;
+    });
 
     return {
         telaAtiva,
         visitantes: visitantesFiltrados,
+        selectedVisitante,
         filtro,
+        isLoading,
         navegarParaCadastro,
+        navegarParaEdicao,
         voltarParaLista,
         handleFiltroChange,
         listarVisitantes,
+        deletarVisitante,
     };
 }
