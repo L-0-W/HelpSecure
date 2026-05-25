@@ -29,8 +29,21 @@ export function useNovoVisitanteViewModel() {
         setVisitante(prev => ({ ...prev, validade }));
     }, []);
 
-    const handleSalvar = useCallback(() => {
+    const handleSalvar = useCallback(async () => {
         console.log('Salvar:', visitante);
+
+        const response = await fetch('https://api-robotica-movel.onrender.com/visitantes', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(visitante),
+        });
+
+
+        console.log(response)
+
     }, [visitante]);
 
     const handleRevogar = useCallback(() => {

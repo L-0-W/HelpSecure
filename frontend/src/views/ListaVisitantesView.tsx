@@ -1,5 +1,5 @@
 // src/screens/Home/ListaVisitantesView.tsx
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
     View,
     Text,
@@ -28,6 +28,10 @@ const COLORS = {
 
 export default function ListaVisitantesView() {
     const vm = useListaVisitantesViewModel();
+
+    useEffect(() => {
+        vm.listarVisitantes();
+    }, [vm]);
 
     // Renderiza a tela ativa (lista ou cadastro)
     if (vm.telaAtiva === 'cadastro') {

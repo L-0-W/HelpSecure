@@ -36,7 +36,7 @@ type Tela = 'lista' | 'cadastro';
 
 export function useListaVisitantesViewModel() {
     const [telaAtiva, setTelaAtiva] = useState<Tela>('lista');
-    const [visitantes] = useState<Visitante[]>(MOCK_VISITANTES);
+    const [visitantes, setVisitantes] = useState<Visitante[]>(MOCK_VISITANTES);
     const [filtro, setFiltro] = useState<'todos' | 'ativos' | 'expirados'>('todos');
 
     const visitantesFiltrados = visitantes.filter((v) => {
@@ -58,6 +58,18 @@ export function useListaVisitantesViewModel() {
         setFiltro(novoFiltro);
     }, []);
 
+    const listarVisitantes = useCallback(async () => {
+        const response = await fetch('https://api-robotica-movel.onrender.com/visitantes', {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            },
+        });
+
+        const data = await response.json();
+        setVisitantes(data);
+    }, []);
+
     return {
         telaAtiva,
         visitantes: visitantesFiltrados,
@@ -65,5 +77,6 @@ export function useListaVisitantesViewModel() {
         navegarParaCadastro,
         voltarParaLista,
         handleFiltroChange,
+        listarVisitantes,
     };
 }

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Alert } from 'react-native';
 import * as LocalAuthentication from 'expo-local-authentication';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface LoginViewModelProps {
   navigateToRegister?: () => void;
@@ -46,7 +47,7 @@ export const useLoginViewModel = (props?: LoginViewModelProps) => {
       const data = await response.json();
 
       if (response.ok) {
-        // Você poderia salvar o data.token aqui (ex: AsyncStorage)
+        await AsyncStorage.setItem('token', data.token);
         if (props?.navigateToHome) {
           props.navigateToHome();
         }
