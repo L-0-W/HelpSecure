@@ -2,11 +2,7 @@ import { useState } from 'react';
 import { Alert } from 'react-native';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { authService } from '../services/authService';
-
-interface LoginViewModelProps {
-  navigateToRegister?: () => void;
-  navigateToHome?: () => void;
-}
+import { LoginViewModelProps } from '../models/models';
 
 export const useLoginViewModel = (props?: LoginViewModelProps) => {
   const [email, setEmail] = useState('');
@@ -41,7 +37,13 @@ export const useLoginViewModel = (props?: LoginViewModelProps) => {
         props.navigateToHome();
       }
     } catch (err: any) {
-      setError(err.message || 'Não foi possível conectar ao servidor.');
+
+      if (err.message === "invalid_credentials") {
+        setError("Email ou senha invalidos");
+      } else {
+        setError('Não foi possível conectar ao servidor.');
+      }
+
     } finally {
       setIsLoading(false);
     }
@@ -77,11 +79,10 @@ export const useLoginViewModel = (props?: LoginViewModelProps) => {
   };
 
   const onCreateAccount = () => {
-    if (props?.navigateToRegister) {
-      props.navigateToRegister();
-    } else {
-      Alert.alert('Criar Conta', 'Redirecionando...');
-    }
+    if (!props?.navigateToRegister)
+      return;
+
+    props.navigateToRegister();
   };
 
   return {

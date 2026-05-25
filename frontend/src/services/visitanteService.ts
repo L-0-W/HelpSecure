@@ -1,12 +1,6 @@
 // src/services/visitanteService.ts
 import { apiRequest } from './api';
-
-export interface VisitantePayload {
-    nome: string;
-    validade: string;
-    local_id: number | null;
-    face_image_bytes: number[];
-}
+import { VisitantePayload } from '../models/models';
 
 export const visitanteService = {
     async listar(): Promise<any[]> {

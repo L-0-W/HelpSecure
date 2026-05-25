@@ -5,7 +5,7 @@ const BASE_URL = 'https://api-robotica-movel.onrender.com';
 
 export async function apiRequest(endpoint: string, options: RequestInit = {}) {
     const token = await AsyncStorage.getItem('token');
-    
+
     const headers = {
         'Content-Type': 'application/json',
         ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
@@ -22,7 +22,6 @@ export async function apiRequest(endpoint: string, options: RequestInit = {}) {
         throw new Error(errorData.error || `Erro de rede: código ${response.status}`);
     }
 
-    // Algumas chamadas de DELETE ou PUT podem retornar vazio ou { ok: true }
     if (response.status === 204) {
         return null;
     }

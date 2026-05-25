@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { Local } from '../models/local';
+import { Local } from '../models/models';
 import { Alert } from 'react-native';
 import { localService } from '../services/localService';
 
