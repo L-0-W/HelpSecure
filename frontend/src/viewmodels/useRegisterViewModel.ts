@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Alert } from 'react-native';
+import { authService } from '../services/authService';
 
 interface RegisterViewModelProps {
   navigateToLogin?: () => void;
@@ -39,25 +40,12 @@ export const useRegisterViewModel = (props?: RegisterViewModelProps) => {
 
     try {
       setIsLoading(true);
-      const response = await fetch('https://api-robotica-movel.onrender.com/usuarios', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ nome: name, email, senha: password }),
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        if (props?.navigateToHome) {
-          props.navigateToHome();
-        }
-      } else {
-        setError(data.error || 'Não foi possível criar a conta');
+      await authService.register(name, email, password);
+      if (props?.navigateToHome) {
+        props.navigateToHome();
       }
-    } catch (err) {
-      setError('Não foi possível conectar ao servidor.');
+    } catch (err: any) {
+      setError(err.message || 'Não foi possível conectar ao servidor.');
     } finally {
       setIsLoading(false);
     }

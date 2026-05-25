@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Alert } from 'react-native';
 import * as LocalAuthentication from 'expo-local-authentication';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { authService } from '../services/authService';
 
 interface LoginViewModelProps {
   navigateToRegister?: () => void;
@@ -36,26 +36,12 @@ export const useLoginViewModel = (props?: LoginViewModelProps) => {
 
     try {
       setIsLoading(true);
-      const response = await fetch('https://api-robotica-movel.onrender.com/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, senha: password }),
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        await AsyncStorage.setItem('token', data.token);
-        if (props?.navigateToHome) {
-          props.navigateToHome();
-        }
-      } else {
-        setError(data.error || 'Credenciais inválidas');
+      await authService.login(email, password);
+      if (props?.navigateToHome) {
+        props.navigateToHome();
       }
-    } catch (err) {
-      setError('Não foi possível conectar ao servidor.');
+    } catch (err: any) {
+      setError(err.message || 'Não foi possível conectar ao servidor.');
     } finally {
       setIsLoading(false);
     }

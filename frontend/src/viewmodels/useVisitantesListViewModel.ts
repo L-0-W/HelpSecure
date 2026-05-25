@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Alert } from 'react-native';
+import { visitanteService } from '../services/visitanteService';
 
 type Tela = 'lista' | 'cadastro' | 'edicao';
 
@@ -33,26 +33,8 @@ export function useListaVisitantesViewModel() {
     const listarVisitantes = useCallback(async () => {
         setIsLoading(true);
         try {
-            const token = await AsyncStorage.getItem('token');
-            const response = await fetch('https://api-robotica-movel.onrender.com/visitantes', {
-                method: 'GET',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                },
-            });
-
-            if (response.ok) {
-                const data = await response.json();
-                if (data && Array.isArray(data)) {
-                    setVisitantes(data);
-                } else if (data && data.visitantes && Array.isArray(data.visitantes)) {
-                    setVisitantes(data.visitantes);
-                } else {
-                    setVisitantes([]);
-                }
-            } else {
-                setVisitantes([]);
-            }
+            const data = await visitanteService.listar();
+            setVisitantes(data);
         } catch (e) {
             console.error('Erro ao listar visitantes:', e);
             setVisitantes([]);
@@ -64,19 +46,7 @@ export function useListaVisitantesViewModel() {
     const deletarVisitante = useCallback(async (id: number) => {
         setIsLoading(true);
         try {
-            const token = await AsyncStorage.getItem('token');
-            const response = await fetch(`https://api-robotica-movel.onrender.com/visitantes/${id}`, {
-                method: 'DELETE',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                },
-            });
-
-            if (!response.ok) {
-                const data = await response.json().catch(() => ({}));
-                throw new Error(data.error || 'Erro ao excluir visitante');
-            }
-
+            await visitanteService.deletar(id);
             await listarVisitantes();
         } catch (err: any) {
             Alert.alert('Erro', err.message || 'Não foi possível excluir o visitante.');
@@ -85,6 +55,7 @@ export function useListaVisitantesViewModel() {
         }
     }, [listarVisitantes]);
 
+    // Filtragem local
     const visitantesFiltrados = visitantes.filter((v) => {
         const status = v.status || 'ativo';
         if (filtro === 'ativos') return status === 'ativo';

@@ -1,9 +1,7 @@
 import { useState, useCallback } from 'react';
 import { Local } from '../models/local';
 import { Alert } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-
-const BASE_URL = 'https://api-robotica-movel.onrender.com/locais';
+import { localService } from '../services/localService';
 
 export function useLocalViewModel() {
     const [telaAtiva, setTelaAtiva] = useState<'lista' | 'cadastro' | 'edicao'>('lista');
@@ -42,28 +40,8 @@ export function useLocalViewModel() {
         setIsLoading(true);
         setError(null);
         try {
-            const token = await AsyncStorage.getItem('token');
-            const response = await fetch(BASE_URL, {
-                method: 'GET',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                },
-            });
-
-            if (!response.ok) {
-                throw new Error('Falha ao buscar locais');
-            }
-
-            const data = await response.json();
-            console.log(data);
-
-            if (data && Array.isArray(data)) {
-                setLocais(data);
-            } else if (data && data.locais && Array.isArray(data.locais)) {
-                setLocais(data.locais);
-            } else {
-                setLocais([]);
-            }
+            const data = await localService.listar();
+            setLocais(data);
         } catch (err: any) {
             setError(err.message || 'Erro ao carregar locais.');
         } finally {
@@ -80,24 +58,11 @@ export function useLocalViewModel() {
         setIsLoading(true);
         setError(null);
         try {
-            const token = await AsyncStorage.getItem('token');
-            const url = selectedLocal ? `${BASE_URL}/${selectedLocal.id}` : BASE_URL;
-            const method = selectedLocal ? 'PUT' : 'POST';
-
-            const response = await fetch(url, {
-                method,
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ nome, descricao }),
-            });
-
-            if (!response.ok) {
-                const data = await response.json().catch(() => ({}));
-                throw new Error(data.error || 'Erro ao salvar local');
+            if (selectedLocal) {
+                await localService.atualizar(selectedLocal.id, nome, descricao);
+            } else {
+                await localService.criar(nome, descricao);
             }
-
             await listarLocais();
             voltarParaLista();
         } catch (err: any) {
@@ -111,19 +76,7 @@ export function useLocalViewModel() {
         setIsLoading(true);
         setError(null);
         try {
-            const token = await AsyncStorage.getItem('token');
-            const response = await fetch(`${BASE_URL}/${id}`, {
-                method: 'DELETE',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                },
-            });
-
-            if (!response.ok) {
-                const data = await response.json().catch(() => ({}));
-                throw new Error(data.error || 'Erro ao excluir local');
-            }
-
+            await localService.deletar(id);
             await listarLocais();
         } catch (err: any) {
             Alert.alert('Erro', err.message || 'Não foi possível excluir o local.');
