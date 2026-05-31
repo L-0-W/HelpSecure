@@ -1,93 +1,146 @@
 <!DOCTYPE html>
 <html lang="pt-br">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ESP32-CAM Stream</title>
-    <div style="margin-top: 20px;">
-        <button onclick="toggleLight('LIGAR_FLASH')" style="padding: 10px; background: orange;">Ligar Flash</button>
-        <button onclick="toggleLight('DESLIGAR_FLASH')" style="padding: 10px;">Desligar Flash</button>
-        <button onclick="toggleLed()" style="padding: 10px;">Desligar Flash</button>
-    </div>
     <style>
-        body { font-family: sans-serif; text-align: center; background: #222; color: white; }
-        #stream { max-width: 100%; border: 5px solid #444; border-radius: 8px; margin-top: 20px; }
-        .status { margin: 10px; padding: 10px; font-weight: bold; }
-        .connected { color: #4CAF50; }
-        .disconnected { color: #f44336; }
+        body {
+            font-family: sans-serif;
+            text-align: center;
+            background: #222;
+            color: white;
+        }
+
+        #stream {
+            max-width: 100%;
+            border: 5px solid #444;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+
+        .status {
+            margin: 10px;
+            padding: 10px;
+            font-weight: bold;
+        }
+
+        .connected {
+            color: #4CAF50;
+        }
+
+        .disconnected {
+            color: #f44336;
+        }
+
+        button {
+            padding: 10px 15px;
+            margin: 5px;
+            font-weight: bold;
+            cursor: pointer;
+            border-radius: 4px;
+            border: none;
+        }
+
+        .btn-flash {
+            background: orange;
+            color: black;
+        }
+
+        .btn-led {
+            background: #008CBA;
+            color: white;
+        }
     </style>
 </head>
+
 <body>
 
     <h2>Streaming WebSocket ESP32-CAM</h2>
     <div id="status" class="status disconnected">Desconectado</div>
-    
+
+    <div style="margin-top: 20px;">
+        <button class="btn-flash" onclick="toggleLight('LIGAR_FLASH')">Ligar Flash</button>
+        <button onclick="toggleLight('DESLIGAR_FLASH')">Desligar Flash</button>
+        <button id="btnLed" class="btn-led" onclick="toggleLed()">Ligar LED Interno</button>
+    </div>
+
+    <br>
     <img id="stream" src="" alt="Aguardando stream...">
 
     <script>
-        // Substitua pelo IP que aparece no Serial Monitor do seu ESP32
-        const gateway = `ws://192.168.0.109/ws`; 
+        // ALTERAÇÃO: Adicionada a rota '/ws' no final para o proxy do Render identificar o Handshake.
+        const gateway = `wss://api-robotica-movel.onrender.com/ws`;
+
         let websocket;
         const streamImg = document.getElementById('stream');
         const statusDiv = document.getElementById('status');
+        const btnLed = document.getElementById('btnLed');
 
-        let ledState = 0;
+        let ledState = 0; // 0 = Desligado, 1 = Ligado
 
         function initWebSocket() {
-            console.log('Tentando abrir conexão WebSocket...');
+            console.log('Tentando abrir conexão WebSocket no Render...');
             websocket = new WebSocket(gateway);
-            
-            // Define o tipo de dado como blob (binário para o JPEG)
+
+            // Define o tipo de dado como blob (binário para o JPEG bruto do ESP32)
             websocket.binaryType = "blob";
 
             websocket.onopen = () => {
-                statusDiv.innerText = "Conectado";
+                statusDiv.innerText = "Conectado ao Render";
                 statusDiv.className = "status connected";
+                console.log("Conectado com sucesso!");
             };
 
-            websocket.onclose = () => {
+            websocket.onclose = (e) => {
                 statusDiv.innerText = "Desconectado - Tentando reconectar...";
                 statusDiv.className = "status disconnected";
+                console.error("Conexão fechada. Código:", e.code, "Motivo:", e.reason);
+                // Tenta reconectar após 2 segundos
                 setTimeout(initWebSocket, 2000);
             };
 
             websocket.onmessage = (event) => {
-                // event.data contém o frame binário enviado pelo ESP32
+                // Captura os frames de vídeo enviados como binário pelo ESP32-CAM
                 if (event.data instanceof Blob) {
-                    // Cria uma URL temporária para o Blob recebido
                     const url = URL.createObjectURL(event.data);
-                    
-                    // Substitui a imagem anterior pela nova
                     const oldUrl = streamImg.src;
                     streamImg.src = url;
 
-                    // Limpa a URL antiga da memória para evitar travamento do navegador
+                    // Libera memória do frame anterior para evitar crash no navegador por estouro de RAM
                     if (oldUrl.startsWith('blob:')) {
                         URL.revokeObjectURL(oldUrl);
                     }
+                } else {
+                    // Caso o servidor mande alguma confirmação em texto (string)
+                    console.log("Mensagem de texto recebida do servidor:", event.data);
                 }
             };
+
+            websocket.onerror = (error) => {
+                console.error("Erro no WebSocket: ", error);
+            };
         }
-        
+
         function toggleLight(comando) {
-            if (websocket.readyState === WebSocket.OPEN) {
+            if (websocket && websocket.readyState === WebSocket.OPEN) {
                 websocket.send(comando);
             }
         }
 
-        function toggleLed(){
-            if (websocket.readyState === websocket.OPEN){
-               
-                if(ledState === 0)
-                {
-                  websocket.send("LIGAR_LED");
-                  ledState = 1;
-                }
-                
-                if (ledState === 1)
-                {
+        function toggleLed() {
+            if (websocket && websocket.readyState === WebSocket.OPEN) {
+                if (ledState === 0) {
+                    websocket.send("LIGAR_LED");
+                    ledState = 1;
+                    btnLed.innerText = "Desligar LED Interno";
+                    btnLed.style.background = "#f44336";
+                } else if (ledState === 1) {
                     websocket.send("DESLIGAR_LED");
                     ledState = 0;
+                    btnLed.innerText = "Ligar LED Interno";
+                    btnLed.style.background = "#008CBA";
                 }
             }
         }
@@ -95,4 +148,5 @@
         window.onload = initWebSocket;
     </script>
 </body>
+
 </html>

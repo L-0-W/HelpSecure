@@ -1,18 +1,15 @@
-//! WebSocket para câmeras: a ESP **liga-se** ao servidor, envia JSON `{"token":"..."}` na
-//! primeira mensagem de texto; o servidor valida na base, atualiza `cam_ip` (IP do peer TCP)
-//! e mantém o mapeamento `camera_id -> usuario_id` enquanto a ligação existir.
-
-use std::collections::HashMap;
-use std::net::TcpListener;
-use std::sync::{Arc, Mutex};
-use std::time::Duration;
-
+use crate::db::{get_camera_by_token, update_camera_ip};
+use crate::AppState;
+use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
+use axum::extract::{ConnectInfo, State};
+use axum::response::IntoResponse;
+use futures_util::{SinkExt, StreamExt};
 use rusqlite::Connection;
 use serde::Deserialize;
 use serde_json::json;
-use tungstenite::{accept, Message};
-
-use crate::db::{get_camera_by_token, update_camera_ip};
+use std::collections::HashMap;
+use std::net::SocketAddr;
+use std::sync::{Arc, Mutex};
 
 #[derive(Deserialize)]
 struct CamAuthMsg {
@@ -43,40 +40,27 @@ impl Drop for ActiveEntry {
     }
 }
 
-fn send_json(ws: &mut tungstenite::WebSocket<std::net::TcpStream>, v: &serde_json::Value) {
+async fn send_json(ws: &mut WebSocket, v: &serde_json::Value) {
     if let Ok(s) = serde_json::to_string(v) {
-        let _ = ws.send(Message::Text(s.into()));
+        let _ = ws.send(Message::Text(s.into())).await;
     }
 }
 
-fn handle_stream(
-    stream: std::net::TcpStream,
-    db: Arc<Mutex<Connection>>,
-    active: ActiveCameras,
-) {
-    let _ = stream.set_read_timeout(Some(Duration::from_secs(120)));
-    let _ = stream.set_write_timeout(Some(Duration::from_secs(30)));
+pub async fn ws_handler(
+    ws: WebSocketUpgrade,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    State(state): State<Arc<AppState>>,
+) -> impl IntoResponse {
+    let peer_ip = addr.ip().to_string();
+    ws.on_upgrade(move |socket| handle_socket(socket, state, peer_ip))
+}
 
-    let peer_ip = stream
-        .peer_addr()
-        .ok()
-        .map(|a| a.ip().to_string())
-        .filter(|s| !s.is_empty())
-        .unwrap_or_else(|| "unknown".to_string());
-
-    let mut ws = match accept(stream) {
-        Ok(w) => w,
-        Err(e) => {
-            eprintln!("ws camera: handshake {e}");
-            return;
-        }
-    };
-
-    let first = match ws.read() {
-        Ok(m) => m,
-        Err(e) => {
-            eprintln!("ws camera: primeira leitura {e}");
-            let _ = ws.close(None);
+async fn handle_socket(mut ws: WebSocket, state: Arc<AppState>, peer_ip: String) {
+    let first = match ws.next().await {
+        Some(Ok(m)) => m,
+        _ => {
+            eprintln!("ws camera: primeira leitura falhou");
+            let _ = ws.close().await;
             return;
         }
     };
@@ -84,12 +68,13 @@ fn handle_stream(
     let text = match first {
         Message::Text(t) => t.to_string(),
         Message::Ping(d) => {
-            let _ = ws.send(Message::Pong(d));
+            let _ = ws.send(Message::Pong(d)).await;
             send_json(
                 &mut ws,
                 &json!({"ok": false, "error": "expected_json_with_token_first"}),
-            );
-            let _ = ws.close(None);
+            )
+            .await;
+            let _ = ws.close().await;
             return;
         }
         Message::Close(_) => return,
@@ -97,8 +82,9 @@ fn handle_stream(
             send_json(
                 &mut ws,
                 &json!({"ok": false, "error": "expected_text_json_first"}),
-            );
-            let _ = ws.close(None);
+            )
+            .await;
+            let _ = ws.close().await;
             return;
         }
     };
@@ -106,48 +92,40 @@ fn handle_stream(
     let auth: CamAuthMsg = match serde_json::from_str(text.trim()) {
         Ok(a) => a,
         Err(_) => {
-            send_json(&mut ws, &json!({"ok": false, "error": "invalid_json"}));
-            let _ = ws.close(None);
+            send_json(&mut ws, &json!({"ok": false, "error": "invalid_json"})).await;
+            let _ = ws.close().await;
             return;
         }
     };
 
     let token = auth.token.trim();
     if token.is_empty() {
-        send_json(&mut ws, &json!({"ok": false, "error": "missing_token"}));
-        let _ = ws.close(None);
+        send_json(&mut ws, &json!({"ok": false, "error": "missing_token"})).await;
+        let _ = ws.close().await;
         return;
     }
 
-    let (cam_id, user_id) = {
-        let conn = match db.lock() {
-            Ok(c) => c,
-            Err(_) => {
-                send_json(&mut ws, &json!({"ok": false, "error": "database_lock"}));
-                let _ = ws.close(None);
-                return;
-            }
-        };
-
-        match get_camera_by_token(&conn, token) {
+    let db_res = match state.db.lock() {
+        Err(_) => Err("database_lock"),
+        Ok(conn) => match get_camera_by_token(&conn, token) {
             Ok(Some(ids)) => {
                 if update_camera_ip(&conn, token, &peer_ip).is_err() {
-                    send_json(&mut ws, &json!({"ok": false, "error": "database_error"}));
-                    let _ = ws.close(None);
-                    return;
+                    Err("database_error")
+                } else {
+                    Ok(ids)
                 }
-                ids
             }
-            Ok(None) => {
-                send_json(&mut ws, &json!({"ok": false, "error": "invalid_token"}));
-                let _ = ws.close(None);
-                return;
-            }
-            Err(_) => {
-                send_json(&mut ws, &json!({"ok": false, "error": "database_error"}));
-                let _ = ws.close(None);
-                return;
-            }
+            Ok(None) => Err("invalid_token"),
+            Err(_) => Err("database_error"),
+        },
+    }; // conn is dropped here
+
+    let (cam_id, user_id) = match db_res {
+        Ok(ids) => ids,
+        Err(e) => {
+            send_json(&mut ws, &json!({"ok": false, "error": e})).await;
+            let _ = ws.close().await;
+            return;
         }
     };
 
@@ -159,58 +137,29 @@ fn handle_stream(
             "usuario_id": user_id,
             "peer_ip": peer_ip
         }),
-    );
+    )
+    .await;
 
-    let _guard = ActiveEntry::register(active, cam_id, user_id);
+    let _guard = ActiveEntry::register(state.active_cameras.clone(), cam_id, user_id);
 
     loop {
-        match ws.read() {
-            Ok(Message::Ping(d)) => {
-                let _ = ws.send(Message::Pong(d));
+        match ws.next().await {
+            Some(Ok(Message::Ping(d))) => {
+                let _ = ws.send(Message::Pong(d)).await;
             }
-            Ok(Message::Pong(_)) => {}
-            Ok(Message::Close(_)) => break,
-            Ok(Message::Binary(_)) => {
-                // Reservado: frames de imagem / telemetria para reencaminhar ao app.
+            Some(Ok(Message::Pong(_))) => {}
+            Some(Ok(Message::Close(_))) | None => break,
+            Some(Ok(Message::Binary(_))) => {
+                // Reservado: frames de imagem
             }
-            Ok(Message::Text(_)) => {
-                // Opcional: heartbeat JSON; ignorar por agora.
+            Some(Ok(Message::Text(_))) => {
+                // Heartbeat
             }
-            Ok(Message::Frame(_)) => {}
-            Err(e) => {
-                eprintln!("ws camera {} read: {e}", cam_id);
+            Some(Err(e)) => {
+                eprintln!("ws camera {} read error: {}", cam_id, e);
                 break;
             }
         }
     }
-    let _ = ws.close(None);
-}
-
-/// Aceita ligações em `bind` (ex. `0.0.0.0:9000`). Cada cliente corre numa thread.
-fn camera_ws_listen_loop(db: Arc<Mutex<Connection>>, active: ActiveCameras, bind: &str) {
-    let listener = match TcpListener::bind(bind) {
-        Ok(l) => l,
-        Err(e) => {
-            eprintln!("ws camera: não foi possível escutar em {bind}: {e}");
-            return;
-        }
-    };
-    eprintln!("WebSocket câmeras: ws://{bind}/ (primeira mensagem: {{\"token\":\"...\"}} )");
-
-    for stream in listener.incoming() {
-        let stream = match stream {
-            Ok(s) => s,
-            Err(e) => {
-                eprintln!("ws camera: accept {e}");
-                continue;
-            }
-        };
-        let db = db.clone();
-        let active = active.clone();
-        std::thread::spawn(move || handle_stream(stream, db, active));
-    }
-}
-
-pub fn spawn_camera_ws_server(db: Arc<Mutex<Connection>>, active: ActiveCameras, bind: String) {
-    std::thread::spawn(move || camera_ws_listen_loop(db, active, &bind));
+    let _ = ws.close().await;
 }

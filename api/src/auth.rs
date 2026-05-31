@@ -114,8 +114,7 @@ pub fn verify_jwt(secret: &[u8], token: &str) -> Result<i64, AuthError> {
     let payload_raw = URL_SAFE_NO_PAD
         .decode(parts[1])
         .map_err(|_| AuthError::Jwt)?;
-    let payload: JwtPayload =
-        serde_json::from_slice(&payload_raw).map_err(|_| AuthError::Jwt)?;
+    let payload: JwtPayload = serde_json::from_slice(&payload_raw).map_err(|_| AuthError::Jwt)?;
 
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -125,8 +124,5 @@ pub fn verify_jwt(secret: &[u8], token: &str) -> Result<i64, AuthError> {
         return Err(AuthError::Jwt);
     }
 
-    payload
-        .sub
-        .parse::<i64>()
-        .map_err(|_| AuthError::Jwt)
+    payload.sub.parse::<i64>().map_err(|_| AuthError::Jwt)
 }

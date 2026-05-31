@@ -34,6 +34,14 @@ Objetivo: quando alguém **compra** uma câmera, ela passa a pertencer à **cont
 
 **Token = identidade da câmera; `usuario_id` = dono na base; WebSocket = a ESP liga-se à API, autentica com o token, e o servidor associa sessão + IP visível ao utilizador dono.**
 
+### 1.1 Alinhamento com a Especificação (`doc/tarefa.md` e `doc/rules.md`)
+
+A implementação atual atende de forma coesa aos requisitos de `doc/tarefa.md`, incorporando uma **melhoria arquitetural crítica**:
+- **Requisito Original:** Previa um endpoint `GET /receberIP` para a câmera "cadastrar" seu IP, e em seguida, o servidor conectar via WebSocket ao IP da câmera.
+- **A Melhoria (Implementada):** Como a grande maioria das câmeras ESP32 estará conectada através de redes NAT (roteadores residenciais comuns), o servidor na nuvem **não consegue iniciar uma conexão direta** para a câmera de forma confiável. Para contornar essa limitação física, a arquitetura foi invertida: **A própria câmera ESP32 é quem inicia a conexão WebSocket para o servidor** (`WS_BIND_ADDR`). Essa mudança elimina completamente a necessidade do `/receberIP` e contorna qualquer limitação de firewall/NAT, alcançando de forma muito mais eficaz o objetivo final de streaming bidirecional.
+- **Login, Cadastro e JWT:** A API já atende plenamente a solicitação de possuir "endpoints de login/cadastro, utilizando JWT para manter conectado", assim como as "senhas hasheadas para guardar no banco de dados". A integração de Argon2 (hashing) e a geração autossuficiente de JWT via `hmac` alinham-se aos padrões de segurança desejados, de forma leve.
+- **Progresso Gradual (`doc/rules.md`):** Obedecendo à regra de "NÃO FAZER TUDO DE UMA VEZ", a fundação (autenticação, contas de usuário e o registro das câmeras via WS) foi consolidada e validada primeiro, deixando os CRUDs de visitantes e locais como os próximos passos seguros a serem integrados à base sólida.
+
 ---
 
 ## 2. Endpoints implementados (estado atual)
@@ -52,6 +60,16 @@ Objetivo: quando alguém **compra** uma câmera, ela passa a pertencer à **cont
 | `GET` | `/cameras/:id` | Bearer = JWT | Detalhe de uma câmera do dono (**sem** `token`). |
 | `PUT` | `/cameras/:id` | Bearer = JWT | Atualizar `nome` (JSON `{"nome":"..."}` ou `null` / `""` para limpar). |
 | `DELETE` | `/cameras/:id` | Bearer = JWT | Remover câmera do utilizador. |
+| `POST` | `/locais` | Bearer = JWT | Criar local para o utilizador. |
+| `GET` | `/locais` | Bearer = JWT | Listar locais do utilizador. |
+| `GET` | `/locais/:id` | Bearer = JWT | Obter detalhe de um local. |
+| `PUT` | `/locais/:id` | Bearer = JWT | Atualizar local (nome, descricao). |
+| `DELETE` | `/locais/:id` | Bearer = JWT | Remover local. |
+| `POST` | `/visitantes` | Bearer = JWT | Criar visitante. |
+| `GET` | `/visitantes` | Bearer = JWT | Listar visitantes do utilizador. |
+| `GET` | `/visitantes/:id` | Bearer = JWT | Obter detalhe de um visitante. |
+| `PUT` | `/visitantes/:id` | Bearer = JWT | Atualizar visitante. |
+| `DELETE` | `/visitantes/:id` | Bearer = JWT | Remover visitante. |
 
 ### WebSocket — câmera (`camera_ws`)
 
@@ -132,6 +150,45 @@ Corpo opcional: `{ "nome": "Sala" }` ou `{}`. O nome é opcional.
 - **404:** `camera_not_found` se o id não existir ou não for do utilizador.  
 - **PUT:** corpo `{"nome": "..."}` obrigatório (chave `nome` presente); string vazia ou `null` em `nome` grava `NULL` na base.
 
+### `POST /locais`
+Corpo JSON:
+```json
+{ "nome": "Escritorio", "descricao": "Espaço de trabalho" }
+```
+- **201:** `{"id": 1, "nome": "Escritorio", "descricao": "Espaço de trabalho"}`.
+- **400:** `invalid_nome`.
+
+### `GET /locais`
+- **200:** `{"locais": [ { "id": 1, "nome": "Escritorio", "descricao": "Espaço de trabalho" } ]}`.
+
+### `GET /locais/:id` / `PUT` / `DELETE`
+- **GET (200):** Detalhe do local.
+- **PUT:** Corpo `{ "nome": "Novo Nome", "descricao": "Nova Descricao" }` (pelo menos um campo). Retorna `200` com o local atualizado.
+- **DELETE (200):** `{"ok": true}`. Apaga o local e desvincula visitantes (local_id passa a NULL).
+- **404:** `local_not_found`.
+
+### `POST /visitantes`
+Corpo JSON:
+```json
+{
+  "nome": "Carlos",
+  "validade": "2026-12-31T23:59:59Z",
+  "local_id": 1,
+  "face_image_bytes": [1, 2, 3, 4]
+}
+```
+- **201:** Retorna `201` com o JSON do visitante criado contendo `id`, `nome`, `validade`, `local_id`, `face_image_bytes` e `embedding`.
+- **400:** `invalid_nome`, `invalid_validade`, `invalid_local_id` (se local não existir ou não for do utilizador).
+
+### `GET /visitantes`
+- **200:** `{"visitantes": [ { "id", "nome", "validade", "local_id", "face_image_bytes", "embedding" } ]}`.
+
+### `GET /visitantes/:id` / `PUT` / `DELETE`
+- **GET (200):** Detalhe do visitante.
+- **PUT:** Corpo parcial do visitante para atualizar. Retorna `200` com o visitante atualizado.
+- **DELETE (200):** `{"ok": true}`.
+- **404:** `visitante_not_found`.
+
 ### Variáveis de ambiente
 
 | Variável | Padrão | Função |
@@ -154,11 +211,25 @@ Corpo opcional: `{ "nome": "Sala" }` ou `{}`. O nome é opcional.
 
 - **`usuarios`** — `nome`, `email` UNIQUE, `senha_hash` (Argon2), `criado_em`.  
 - **`cameras`** — `token` UNIQUE, `usuario_id` (dono), `nome`, `cam_ip`, `criado_em`.  
-- **`locais`**, **`visitantes`** — preparados para CRUD futuro.
+- **`locais`** — `id`, `nome`, `descricao`, `usuario_id` (dono), `criado_em`.
+- **`visitantes`** — `id`, `nome`, `embedding`, `validade`, `local_id` (FK locais), `usuario_id` (dono), `face_image_bytes` (BLOB), `criado_em`.
 
 ---
 
 ## 4. Changelog (alterações relevantes)
+
+### 2026-05-25 — CRUD de Locais e Visitantes (Implementação Completa)
+
+- **Novos Endpoints:** Implementação de todas as operações CRUD para as rotas `/locais`, `/locais/:id`, `/visitantes` e `/visitantes/:id`.
+- **Validação de Negócio e Segurança:** Adição de escopo baseado em JWT/`usuario_id` para garantir o isolamento multi-tenant dos dados. A adição de visitantes valida rigorosamente se o local fornecido existe e pertence ao utilizador.
+- **Suporte a Imagens e TTL:** A tabela de visitantes agora armazena de forma persistente os campos `validade` e `face_image_bytes` (BLOB) conforme especificado no escopo.
+- **Migração Transparente:** Implementado processo automático de migração/alteração de tabelas no banco de dados SQLite existente sem quebras.
+- **Asset de Testes:** Criado o script `test_crud.sh` que executa testes de integração ponta a ponta automatizados para todo o fluxo CRUD.
+
+### 2026-05-15 — Verificação de Coesão e Autenticação (JWT)
+
+- **Validação de Requisitos:** Confirmado que a implementação de autenticação (cadastro e login em `/usuarios` e `/auth/login`) já atende rigorosamente ao exigido em `doc/tarefa.md` (senhas com hash Argon2 e proteção de rotas/middlewares usando JWT).
+- **Documentação Arquitetural:** Documentado o racional por trás de como a solução de WebSocket invertido (ESP32 conectando ao Servidor) substitui o `GET /receberIP` de forma muito mais resiliente perante NATs e firewalls residenciais.
 
 ### 2026-05-13 — WebSocket para câmera (substitui `GET /receberIP`)
 
@@ -260,3 +331,11 @@ Esperado: linha JSON com `"ok":true` e `peer_ip`. O `cam_ip` na base fica com es
 - Reencaminhar frames **Binary** do WebSocket da câmera para o **React Native** (sessão do utilizador autenticado).
 
 Quando existir UML oficial no repositório, ajustar tabelas e atualizar as secções 3 e 4.
+
+---
+
+## 8. Aprendizados e Melhorias (Construção da API)
+
+1. **Simplicidade vs Eficiência em Rust:** O uso de bibliotecas como `tiny_http` acoplado a uma implementação manual, transparente e enxuta do JWT (usando `hmac` e `sha2`) garantiu que a API permaneça extremamente leve (preservando o princípio *"SER O MAIS SIMPLES POSSÍVEL - EM RUST"* da `tarefa.md`). Ao reduzir o uso de dependências excessivamente mágicas, diminuiu-se o tempo de compilação e tornou-se a análise do código mais fácil.
+2. **Inversão de Controle no IoT (WebSocket):** O maior aprendizado arquitetural desta fase foi perceber que no contexto de IoT residencial (ESP32), o servidor assumir que pode se conectar ativamente no IP do dispositivo é irreal por conta do NAT. Fazer o dispositivo abrir a conexão WebSocket com o servidor e mantê-la viva resolve o problema de roteamento e descoberta de IP simultaneamente, o que foi uma evolução vital da arquitetura original.
+3. **Segurança por Design:** Adotar o Argon2 (padrão-ouro em Hashing) desde o dia zero para as contas de usuário garante máxima segurança contra ataques de força bruta. Além disso, estender essa proteção amarrando os tokens físicos gerados para as câmeras aos donos (`usuario_id`) previne o sequestro de conexões WS; mesmo que alguém descubra a porta do WebSocket e o token, o acesso à câmera continua sob controle do seu verdadeiro proprietário.

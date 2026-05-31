@@ -1,4 +1,7 @@
 #include "Camera.h"
+#include "HardwareSerial.h"
+#include "esp32-hal-gpio.h"
+#include "esp_sleep.h"
 
 // Definição de pinos para AI-Thinker
 #define PWDN_GPIO_NUM     32
@@ -50,11 +53,35 @@ Camera::Camera() {
         _config.jpeg_quality = 12;
         _config.fb_count = 1;
     }
+
 }
 
 bool Camera::init() {
+    pinMode(PWDN_GPIO_NUM, OUTPUT);
+    digitalWrite(PWDN_GPIO_NUM, LOW);
+    
     esp_err_t err = esp_camera_init(&_config);
     return (err == ESP_OK);
+}
+
+void Camera::shutdownCamera()
+{
+
+    Serial.println("DESLIGANDO CAMERA");
+    State = 0;
+    
+    esp_camera_deinit();
+    digitalWrite(PWDN_GPIO_NUM, HIGH);
+    
+}
+
+void Camera::powerupCamera()
+{
+    Serial.println("LIGANDO CAMERA");
+    State = 1;
+    digitalWrite(PWDN_GPIO_NUM, LOW);
+
+    esp_camera_init(&_config);
 }
 
 camera_fb_t* Camera::getFrame() {

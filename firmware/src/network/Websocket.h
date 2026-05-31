@@ -20,7 +20,6 @@ private:
     AsyncWebServer _server;
     AsyncWebSocket _wsLocal; // Seu servidor local
     websockets::WebsocketsClient _wsRemote; // Cliente para o Render
-    WiFiClientSecure _secureClient;
 
     static void onEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, 
                         AwsEventType type, void *arg, uint8_t *data, size_t len);

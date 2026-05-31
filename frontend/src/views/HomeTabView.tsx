@@ -5,6 +5,7 @@ import { useHomeViewModel } from '../viewmodels/useHomeViewModel';
 import ListaVisitantesView from './ListaVisitantesView';
 
 import LocalView from './LocalView';
+import CameraView from './CameraView';
 
 import { MaterialIcons, Ionicons } from '@expo/vector-icons';
 import { Text, View, TouchableOpacity, useWindowDimensions, Dimensions, StyleSheet } from 'react-native';
@@ -38,6 +39,7 @@ const styles = StyleSheet.create({
 const renderScene = SceneMap({
     visitantes: ListaVisitantesView,
     locais: LocalView,
+    cameras: CameraView,
 });
 
 export default function HomeTabView() {
@@ -47,7 +49,7 @@ export default function HomeTabView() {
     const [routes] = React.useState([
         { key: 'visitantes', title: 'Visitantes', icon: 'person' as const },
         { key: 'locais', title: 'Locais', icon: 'place' as const },
-
+        { key: 'cameras', title: 'Câmeras', icon: 'videocam' as const },
     ]);
 
     return (

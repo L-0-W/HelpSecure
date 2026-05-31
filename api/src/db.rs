@@ -27,18 +27,33 @@ pub fn init_schema(conn: &Connection) -> Result<()> {
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             nome TEXT NOT NULL,
             descricao TEXT,
+            usuario_id INTEGER REFERENCES usuarios(id) ON DELETE CASCADE,
             criado_em TEXT NOT NULL DEFAULT (datetime('now'))
         );
 
         CREATE TABLE IF NOT EXISTS visitantes (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             nome TEXT NOT NULL,
-            documento TEXT,
+            embedding TEXT,
+            validade TEXT,
             local_id INTEGER REFERENCES locais(id) ON DELETE SET NULL,
+            usuario_id INTEGER REFERENCES usuarios(id) ON DELETE CASCADE,
+            face_image_bytes BLOB,
             criado_em TEXT NOT NULL DEFAULT (datetime('now'))
         );
         ",
     )?;
+
+    // Migrations to add missing columns in existing databases safely
+    let _ = conn.execute("ALTER TABLE locais ADD COLUMN usuario_id INTEGER REFERENCES usuarios(id) ON DELETE CASCADE", []);
+    let _ = conn.execute("ALTER TABLE visitantes ADD COLUMN usuario_id INTEGER REFERENCES usuarios(id) ON DELETE CASCADE", []);
+    let _ = conn.execute("ALTER TABLE visitantes ADD COLUMN validade TEXT", []);
+    let _ = conn.execute(
+        "ALTER TABLE visitantes ADD COLUMN face_image_bytes BLOB",
+        [],
+    );
+    let _ = conn.execute("ALTER TABLE visitantes ADD COLUMN embedding TEXT", []);
+
     Ok(())
 }
 
@@ -58,6 +73,174 @@ pub fn get_camera_by_token(conn: &Connection, token: &str) -> Result<Option<(i64
     )?;
     stmt.query_row(params![token], |r| Ok((r.get(0)?, r.get(1)?)))
         .optional()
+}
+
+// --- locais (donos: usuario_id) ---
+
+pub fn insert_local(
+    conn: &Connection,
+    usuario_id: i64,
+    nome: &str,
+    descricao: Option<&str>,
+) -> Result<i64> {
+    conn.execute(
+        "INSERT INTO locais (nome, descricao, usuario_id) VALUES (?1, ?2, ?3)",
+        params![nome, descricao, usuario_id],
+    )?;
+    Ok(conn.last_insert_rowid())
+}
+
+pub fn list_locais(
+    conn: &Connection,
+    usuario_id: i64,
+) -> Result<Vec<(i64, String, Option<String>)>> {
+    let mut stmt =
+        conn.prepare("SELECT id, nome, descricao FROM locais WHERE usuario_id = ?1 ORDER BY id")?;
+    let rows = stmt.query_map(params![usuario_id], |r| {
+        Ok((r.get(0)?, r.get(1)?, r.get(2)?))
+    })?;
+    rows.collect()
+}
+
+pub fn get_local_for_owner(
+    conn: &Connection,
+    local_id: i64,
+    usuario_id: i64,
+) -> Result<Option<(i64, String, Option<String>)>> {
+    let mut stmt =
+        conn.prepare("SELECT id, nome, descricao FROM locais WHERE id = ?1 AND usuario_id = ?2")?;
+    stmt.query_row(params![local_id, usuario_id], |r| {
+        Ok((r.get(0)?, r.get(1)?, r.get(2)?))
+    })
+    .optional()
+}
+
+pub fn update_local_for_owner(
+    conn: &Connection,
+    local_id: i64,
+    usuario_id: i64,
+    nome: &str,
+    descricao: Option<&str>,
+) -> Result<bool> {
+    let n = conn.execute(
+        "UPDATE locais SET nome = ?1, descricao = ?2 WHERE id = ?3 AND usuario_id = ?4",
+        params![nome, descricao, local_id, usuario_id],
+    )?;
+    Ok(n > 0)
+}
+
+pub fn delete_local_for_owner(conn: &Connection, local_id: i64, usuario_id: i64) -> Result<bool> {
+    let n = conn.execute(
+        "DELETE FROM locais WHERE id = ?1 AND usuario_id = ?2",
+        params![local_id, usuario_id],
+    )?;
+    Ok(n > 0)
+}
+
+// --- visitantes (donos: usuario_id) ---
+
+pub fn insert_visitante(
+    conn: &Connection,
+    usuario_id: i64,
+    nome: &str,
+    validade: Option<&str>,
+    local_id: Option<i64>,
+    face_image_bytes: Option<&[u8]>,
+    embedding: Option<&str>,
+) -> Result<i64> {
+    conn.execute(
+        "INSERT INTO visitantes (nome, validade, local_id, usuario_id, face_image_bytes, embedding) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+        params![nome, validade, local_id, usuario_id, face_image_bytes, embedding],
+    )?;
+    Ok(conn.last_insert_rowid())
+}
+
+pub fn list_visitantes(
+    conn: &Connection,
+    usuario_id: i64,
+) -> Result<
+    Vec<(
+        i64,
+        String,
+        Option<String>,
+        Option<i64>,
+        Option<Vec<u8>>,
+        Option<String>,
+    )>,
+> {
+    let mut stmt = conn.prepare(
+        "SELECT id, nome, validade, local_id, face_image_bytes, embedding FROM visitantes WHERE usuario_id = ?1 ORDER BY id",
+    )?;
+    let rows = stmt.query_map(params![usuario_id], |r| {
+        Ok((
+            r.get(0)?,
+            r.get(1)?,
+            r.get(2)?,
+            r.get(3)?,
+            r.get(4)?,
+            r.get(5)?,
+        ))
+    })?;
+    rows.collect()
+}
+
+pub fn get_visitante_for_owner(
+    conn: &Connection,
+    visitante_id: i64,
+    usuario_id: i64,
+) -> Result<
+    Option<(
+        i64,
+        String,
+        Option<String>,
+        Option<i64>,
+        Option<Vec<u8>>,
+        Option<String>,
+    )>,
+> {
+    let mut stmt = conn.prepare(
+        "SELECT id, nome, validade, local_id, face_image_bytes, embedding FROM visitantes WHERE id = ?1 AND usuario_id = ?2",
+    )?;
+    stmt.query_row(params![visitante_id, usuario_id], |r| {
+        Ok((
+            r.get(0)?,
+            r.get(1)?,
+            r.get(2)?,
+            r.get(3)?,
+            r.get(4)?,
+            r.get(5)?,
+        ))
+    })
+    .optional()
+}
+
+pub fn update_visitante_for_owner(
+    conn: &Connection,
+    visitante_id: i64,
+    usuario_id: i64,
+    nome: &str,
+    validade: Option<&str>,
+    local_id: Option<i64>,
+    face_image_bytes: Option<&[u8]>,
+    embedding: Option<&str>,
+) -> Result<bool> {
+    let n = conn.execute(
+        "UPDATE visitantes SET nome = ?1, validade = ?2, local_id = ?3, face_image_bytes = ?4, embedding = ?5 WHERE id = ?6 AND usuario_id = ?7",
+        params![nome, validade, local_id, face_image_bytes, embedding, visitante_id, usuario_id],
+    )?;
+    Ok(n > 0)
+}
+
+pub fn delete_visitante_for_owner(
+    conn: &Connection,
+    visitante_id: i64,
+    usuario_id: i64,
+) -> Result<bool> {
+    let n = conn.execute(
+        "DELETE FROM visitantes WHERE id = ?1 AND usuario_id = ?2",
+        params![visitante_id, usuario_id],
+    )?;
+    Ok(n > 0)
 }
 
 pub fn insert_usuario(conn: &Connection, nome: &str, email: &str, senha_hash: &str) -> Result<i64> {
@@ -83,12 +266,15 @@ pub fn get_usuario_by_email(
 }
 
 /// (id, nome, email, criado_em)
-pub fn get_usuario_public(conn: &Connection, id: i64) -> Result<Option<(i64, String, String, String)>> {
-    let mut stmt = conn.prepare(
-        "SELECT id, nome, email, criado_em FROM usuarios WHERE id = ?1",
-    )?;
-    stmt.query_row(params![id], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)))
-        .optional()
+pub fn get_usuario_public(
+    conn: &Connection,
+    id: i64,
+) -> Result<Option<(i64, String, String, String)>> {
+    let mut stmt = conn.prepare("SELECT id, nome, email, criado_em FROM usuarios WHERE id = ?1")?;
+    stmt.query_row(params![id], |r| {
+        Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?))
+    })
+    .optional()
 }
 
 struct UsuarioRow {
@@ -98,9 +284,7 @@ struct UsuarioRow {
 }
 
 fn get_usuario_full(conn: &Connection, id: i64) -> Result<Option<UsuarioRow>> {
-    let mut stmt = conn.prepare(
-        "SELECT nome, email, senha_hash FROM usuarios WHERE id = ?1",
-    )?;
+    let mut stmt = conn.prepare("SELECT nome, email, senha_hash FROM usuarios WHERE id = ?1")?;
     stmt.query_row(params![id], |r| {
         Ok(UsuarioRow {
             nome: r.get(0)?,
@@ -220,11 +404,7 @@ pub fn update_camera_nome_for_owner(
     Ok(n > 0)
 }
 
-pub fn delete_camera_for_owner(
-    conn: &Connection,
-    camera_id: i64,
-    usuario_id: i64,
-) -> Result<bool> {
+pub fn delete_camera_for_owner(conn: &Connection, camera_id: i64, usuario_id: i64) -> Result<bool> {
     let n = conn.execute(
         "DELETE FROM cameras WHERE id = ?1 AND usuario_id = ?2",
         params![camera_id, usuario_id],

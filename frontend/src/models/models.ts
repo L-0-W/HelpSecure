@@ -23,3 +23,10 @@ export interface User {
     nome: string,
     email: string
 }
+
+export interface Camera {
+    id: number;
+    nome: string | null;
+    cam_ip: string | null;
+    criado_em: string;
+}
