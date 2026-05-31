@@ -1,6 +1,0 @@
-   Compiling api v0.1.0 (/home/low/Desktop/trabalho_robotica_moveis/api)
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.29s
-     Running `target/debug/api`
-AVISO: JWT_SECRET não definido; usar valor só para desenvolvimento.
-API escutando em http://127.0.0.1:8080 (db: test_api.db)
-WebSocket câmeras: ws://0.0.0.0:9000/ (primeira mensagem: {"token":"..."} )
