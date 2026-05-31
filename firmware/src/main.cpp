@@ -55,13 +55,13 @@ void loop() {
 
     Serial.println(sonico.getSonicoValue());
 
-    if (cam.State == 1 && sonico.getSonicoValue() > 30) cam.shutdownCamera();
+    if (cam.State == 1 && sonico.getSonicoValue() > 45) cam.shutdownCamera();
      
     if (millis() - lastMillis >= interval) 
     {
         lastMillis = millis();
 
-        if (net.shouldStream() && sonico.getSonicoValue() < 30) {
+        if (net.shouldStream() && sonico.getSonicoValue() < 45) {
             
             if (cam.State == 0)  cam.powerupCamera();
 

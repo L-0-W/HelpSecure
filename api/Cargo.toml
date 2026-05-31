@@ -17,3 +17,9 @@ axum = { version = "0.8.9", features = ["ws"] }
 tokio = { version = "1.52.3", features = ["macros", "rt-multi-thread"] }
 tower-http = { version = "0.6.11", features = ["cors"] }
 futures-util = "0.3.32"
+face_id = "0.4.1"
+image = { version = "0.25.10", default-features = false, features = ["jpeg", "png"] }
+chrono = "0.4.44"
+
+[build-dependencies]
+cc = "1.2.63"

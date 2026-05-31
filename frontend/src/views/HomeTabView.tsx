@@ -6,6 +6,7 @@ import ListaVisitantesView from './ListaVisitantesView';
 
 import LocalView from './LocalView';
 import CameraView from './CameraView';
+import LogsView from './LogsView';
 
 import { MaterialIcons, Ionicons } from '@expo/vector-icons';
 import { Text, View, TouchableOpacity, useWindowDimensions, Dimensions, StyleSheet } from 'react-native';
@@ -40,6 +41,7 @@ const renderScene = SceneMap({
     visitantes: ListaVisitantesView,
     locais: LocalView,
     cameras: CameraView,
+    logs: LogsView,
 });
 
 export default function HomeTabView() {
@@ -50,6 +52,7 @@ export default function HomeTabView() {
         { key: 'visitantes', title: 'Visitantes', icon: 'person' as const },
         { key: 'locais', title: 'Locais', icon: 'place' as const },
         { key: 'cameras', title: 'Câmeras', icon: 'videocam' as const },
+        { key: 'logs', title: 'Logs', icon: 'list' as const },
     ]);
 
     return (

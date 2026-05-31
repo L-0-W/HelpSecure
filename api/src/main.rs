@@ -23,6 +23,9 @@ use db::{
     update_local_for_owner, update_usuario, update_visitante_for_owner,
 };
 use rusqlite::Connection;
+use face_id::detector::ScrfdDetector;
+use face_id::embedder::ArcFaceEmbedder;
+use face_id::face_align::norm_crop;
 use std::net::SocketAddr;
 use tokio::net::TcpListener;
 
@@ -228,6 +231,15 @@ struct AuthResponse {
     usuario: UsuarioPublic,
 }
 
+#[derive(Clone, Serialize)]
+pub struct LogMessage {
+    pub usuario_id: i64,
+    pub camera_id: i64,
+    pub message: String,
+    pub timestamp: String,
+    pub success: bool,
+}
+
 struct AppState {
     db: Arc<Mutex<Connection>>,
     jwt_secret: Vec<u8>,
@@ -235,6 +247,9 @@ struct AppState {
     /// Partilhado com `camera_ws`: ligações autenticadas (para relay RN / diagnóstico).
     #[allow(dead_code)]
     active_cameras: ActiveCameras,
+    detector: Arc<std::sync::Mutex<ScrfdDetector>>,
+    embedder: Arc<std::sync::Mutex<ArcFaceEmbedder>>,
+    log_sender: tokio::sync::broadcast::Sender<LogMessage>,
 }
 
 fn json_response<T: Serialize>(status: u16, body: &T) -> Response<std::io::Cursor<Vec<u8>>> {
@@ -979,8 +994,73 @@ fn handle_post_visitantes(
         }
     }
 
-    let embedding = Some("default_embedding_facial_12345");
+    let mut embedding_string = None;
     let face_bytes_ref = b.face_image_bytes.as_deref();
+
+    if let Some(bytes) = face_bytes_ref {
+        if !bytes.is_empty() {
+            let img = match image::load_from_memory(bytes) {
+                Ok(img) => img,
+                Err(_) => {
+                    return json_response(
+                        400,
+                        &JsonError {
+                            error: "A imagem enviada é inválida ou não pôde ser lida.",
+                        },
+                    );
+                }
+            };
+
+            let results = match state.detector.lock().unwrap().detect(&img) {
+                Ok(res) => res,
+                Err(_) => {
+                    return json_response(
+                        500,
+                        &JsonError {
+                            error: "Falha na detecção facial. Tente novamente.",
+                        },
+                    );
+                }
+            };
+
+            if results.is_empty() {
+                return json_response(
+                    400,
+                    &JsonError {
+                        error: "Não foi possível detectar nenhum rosto na foto.",
+                    },
+                );
+            }
+
+            let res = &results[0];
+            let rgb_img = img.to_rgb8();
+            let landmarks = res.landmarks.as_ref().unwrap();
+            let lms_array: [(f32, f32); 5] = landmarks
+                .iter()
+                .map(|&(x, y)| (x * rgb_img.width() as f32, y * rgb_img.height() as f32))
+                .collect::<Vec<_>>()
+                .try_into()
+                .unwrap();
+                
+            let crop = norm_crop(&rgb_img, &lms_array, 112);
+            let embeddings = match state.embedder.lock().unwrap().compute_embeddings_batch(&[crop]) {
+                Ok(e) => e,
+                Err(_) => {
+                    return json_response(
+                        500,
+                        &JsonError {
+                            error: "Falha ao extrair biometria.",
+                        },
+                    );
+                }
+            };
+
+            let emb = &embeddings[0];
+            embedding_string = Some(serde_json::to_string(emb).unwrap());
+        }
+    }
+
+    let embedding = embedding_string.as_deref();
 
     let vid = match insert_visitante(
         &conn,
@@ -2128,16 +2208,35 @@ async fn main() {
 
     let db = Arc::new(Mutex::new(conn));
     let active_cameras: ActiveCameras = Arc::new(Mutex::new(HashMap::new()));
+    
+    // Otimizações pesadas de memória para ONNX Runtime (Render Free Tier - 512MB)
+    std::env::set_var("ORT_ENABLE_ARENA", "0");
+    
+    eprintln!("Carregando modelos ONNX da Biometria localmente (Modo Low-RAM)...");
+    let detector = ScrfdDetector::builder("models/det_500m.onnx")
+        .build()
+        .expect("Failed to initialize Face Detector");
+        
+    let embedder = ArcFaceEmbedder::builder("models/w600k_mbf.onnx")
+        .build()
+        .expect("Failed to initialize Face Embedder");
+    eprintln!("Modelos ONNX carregados com sucesso.");
+
+    let (log_sender, _) = tokio::sync::broadcast::channel(100);
 
     let state = Arc::new(AppState {
         db,
         jwt_secret: jwt_secret.into_bytes(),
         jwt_ttl_secs,
         active_cameras,
+        detector: Arc::new(Mutex::new(detector)),
+        embedder: Arc::new(Mutex::new(embedder)),
+        log_sender,
     });
 
     let app = Router::new()
         .route("/ws", get(camera_ws::ws_handler))
+        .route("/ws/logs", get(logs_ws_handler))
         .fallback(any(axum_fallback))
         .with_state(state);
 
@@ -2147,4 +2246,42 @@ async fn main() {
         addr, db_path
     );
     axum::serve(listener, app.into_make_service_with_connect_info::<SocketAddr>()).await.unwrap();
+}
+
+use axum::extract::ws::{WebSocketUpgrade, WebSocket};
+async fn logs_ws_handler(
+    ws: WebSocketUpgrade,
+    State(state): State<Arc<AppState>>,
+    axum::extract::Query(params): axum::extract::Query<std::collections::HashMap<String, String>>,
+) -> axum::response::Response {
+    let token = if let Some(t) = params.get("token") {
+        t.clone()
+    } else {
+        return axum::http::StatusCode::UNAUTHORIZED.into_response();
+    };
+
+    let user_id = match verify_jwt(&state.jwt_secret, &token) {
+        Ok(uid) => uid,
+        Err(_) => return axum::http::StatusCode::UNAUTHORIZED.into_response(),
+    };
+
+    if user_id == 0 {
+        return axum::http::StatusCode::UNAUTHORIZED.into_response();
+    }
+
+    ws.on_upgrade(move |socket| handle_logs_socket(socket, state, user_id))
+}
+
+async fn handle_logs_socket(mut socket: WebSocket, state: Arc<AppState>, user_id: i64) {
+    let mut rx = state.log_sender.subscribe();
+
+    while let Ok(msg) = rx.recv().await {
+        if msg.usuario_id == user_id {
+            if let Ok(json) = serde_json::to_string(&msg) {
+                if socket.send(axum::extract::ws::Message::Text(json.into())).await.is_err() {
+                    break;
+                }
+            }
+        }
+    }
 }

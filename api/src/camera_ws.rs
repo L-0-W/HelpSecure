@@ -18,6 +18,20 @@ struct CamAuthMsg {
 
 pub type ActiveCameras = Arc<Mutex<HashMap<i64, i64>>>;
 
+fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
+    let mut dot = 0.0;
+    let mut norm_a = 0.0;
+    let mut norm_b = 0.0;
+    for (va, vb) in a.iter().zip(b.iter()) {
+        dot += va * vb;
+        norm_a += va * va;
+        norm_b += vb * vb;
+    }
+    if norm_a == 0.0 || norm_b == 0.0 {
+        return 0.0;
+    }
+    dot / (norm_a.sqrt() * norm_b.sqrt())
+}
 struct ActiveEntry {
     map: ActiveCameras,
     camera_id: i64,
@@ -149,8 +163,81 @@ async fn handle_socket(mut ws: WebSocket, state: Arc<AppState>, peer_ip: String)
             }
             Some(Ok(Message::Pong(_))) => {}
             Some(Ok(Message::Close(_))) | None => break,
-            Some(Ok(Message::Binary(_))) => {
-                // Reservado: frames de imagem
+            Some(Ok(Message::Binary(bytes))) => {
+                let detector = state.detector.clone();
+                let embedder = state.embedder.clone();
+                let db_conn = state.db.clone();
+                let log_sender = state.log_sender.clone();
+                let u_id = user_id;
+                let c_id = cam_id;
+                
+                tokio::task::spawn_blocking(move || {
+                    if let Ok(img) = image::load_from_memory(&bytes) {
+                        let rgb_img = img.to_rgb8();
+                        if let Ok(results) = detector.lock().unwrap().detect(&img) {
+                            if let Some(res) = results.first() {
+                                if let Some(landmarks) = res.landmarks.as_ref() {
+                                    if let Ok(lms_array) = landmarks.iter().map(|&(x,y)| (x * rgb_img.width() as f32, y * rgb_img.height() as f32)).collect::<Vec<_>>().try_into() {
+                                        let crop = face_id::face_align::norm_crop(&rgb_img, &lms_array, 112);
+                                        if let Ok(embeddings) = embedder.lock().unwrap().compute_embeddings_batch(&[crop]) {
+                                            if let Some(target_emb) = embeddings.first() {
+                                                let mut conn = db_conn.lock().unwrap();
+                                                let mut stmt = conn.prepare("SELECT id, nome, embedding FROM visitantes WHERE usuario_id = ? AND embedding IS NOT NULL").unwrap();
+                                                let mut rows = stmt.query([u_id]).unwrap();
+                                                
+                                                let mut max_sim = 0.0;
+                                                let mut found = false;
+                                                while let Ok(Some(row)) = rows.next() {
+                                                    let id: i64 = row.get(0).unwrap();
+                                                    let nome: String = row.get(1).unwrap();
+                                                    let emb_str: String = row.get(2).unwrap();
+                                                    
+                                                    if let Ok(db_emb) = serde_json::from_str::<Vec<f32>>(&emb_str) {
+                                                        let sim = cosine_similarity(target_emb, &db_emb);
+                                                        if sim > max_sim {
+                                                            max_sim = sim;
+                                                        }
+                                                        if sim > 0.6 {
+                                                            println!("✅ Visitante reconhecido! ID: {}, Nome: {} (Score: {:.2})", id, nome, sim);
+                                                            found = true;
+                                                            
+                                                            let _ = log_sender.send(crate::LogMessage {
+                                                                usuario_id: u_id,
+                                                                camera_id: c_id,
+                                                                message: format!("Visitante '{}' reconhecido com sucesso (Score: {:.2})", nome, sim),
+                                                                timestamp: chrono::Utc::now().to_rfc3339(),
+                                                                success: true,
+                                                            });
+                                                            
+                                                            break;
+                                                        }
+                                                    }
+                                                }
+                                                
+                                                if !found {
+                                                    println!("❌ Rosto detectado, mas nenhum visitante compatível encontrado na base. (Max Score: {:.2})", max_sim);
+                                                    let _ = log_sender.send(crate::LogMessage {
+                                                        usuario_id: u_id,
+                                                        camera_id: c_id,
+                                                        message: format!("Tentativa de reconhecimento falhou. Rosto desconhecido. (Score Máx: {:.2})", max_sim),
+                                                        timestamp: chrono::Utc::now().to_rfc3339(),
+                                                        success: false,
+                                                    });
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            } else {
+                                eprintln!("Nenhum rosto detectado na imagem recebida do ESP32.");
+                            }
+                        } else {
+                            eprintln!("Falha na detecção facial.");
+                        }
+                    } else {
+                        eprintln!("Falha ao decodificar a imagem recebida do ESP32.");
+                    }
+                });
             }
             Some(Ok(Message::Text(_))) => {
                 // Heartbeat
