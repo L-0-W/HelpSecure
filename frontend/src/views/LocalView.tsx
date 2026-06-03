@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { Ionicons, MaterialIcons, Feather } from '@expo/vector-icons';
 import { useLocalViewModel } from '../viewmodels/useLocalViewModel';
-import { Local } from '../models/local';
+import { Local } from '../models/models';
 
 const COLORS = {
     background: '#121214',
@@ -63,7 +63,6 @@ export default function LocalView() {
                     contentContainerStyle={styles.scrollContent}
                     showsVerticalScrollIndicator={false}
                 >
-                    {/* Header/Title */}
                     <View style={styles.titleSection}>
                         <Text style={styles.title}>
                             {isEditing ? 'Editar Local' : 'Novo Local'}
@@ -76,16 +75,14 @@ export default function LocalView() {
                         </Text>
                     </View>
 
-                    {/* Card de Informações */}
                     <View style={styles.formCard}>
-                        {vm.error ? (
+                        {vm.erro ? (
                             <View style={styles.errorContainer}>
                                 <Feather name="alert-circle" size={18} color={COLORS.danger} />
-                                <Text style={styles.errorText}>{vm.error}</Text>
+                                <Text style={styles.errorText}>{vm.erro}</Text>
                             </View>
                         ) : null}
 
-                        {/* Campo Nome */}
                         <View style={styles.inputSection}>
                             <Text style={styles.label}>Nome do Local</Text>
                             <TextInput
@@ -98,7 +95,6 @@ export default function LocalView() {
                             />
                         </View>
 
-                        {/* Campo Descrição */}
                         <View style={styles.inputSection}>
                             <Text style={styles.label}>Descrição</Text>
                             <TextInput
@@ -114,15 +110,14 @@ export default function LocalView() {
                     </View>
                 </ScrollView>
 
-                {/* Botões de Ação (fixos embaixo) */}
                 <View style={styles.actionsContainer}>
                     <TouchableOpacity
                         style={styles.salvarButton}
                         onPress={vm.salvarLocal}
-                        disabled={vm.isLoading}
+                        disabled={vm.carregando}
                         activeOpacity={0.9}
                     >
-                        {vm.isLoading ? (
+                        {vm.carregando ? (
                             <ActivityIndicator color={COLORS.background} />
                         ) : (
                             <>
@@ -137,7 +132,7 @@ export default function LocalView() {
                     <TouchableOpacity
                         style={styles.voltarFormButton}
                         onPress={vm.voltarParaLista}
-                        disabled={vm.isLoading}
+                        disabled={vm.carregando}
                         activeOpacity={0.8}
                     >
                         <Ionicons name="close-circle-outline" size={18} color={COLORS.danger} />
@@ -150,7 +145,6 @@ export default function LocalView() {
 
     return (
         <View style={styles.container}>
-            {/* Título e Subtítulo */}
             <View style={styles.titleSection}>
                 <Text style={styles.title}>Locais</Text>
                 <Text style={styles.subtitle}>
@@ -158,8 +152,7 @@ export default function LocalView() {
                 </Text>
             </View>
 
-            {/* Loading / List Content */}
-            {vm.isLoading && vm.locais.length === 0 ? (
+            {vm.carregando && vm.locais.length === 0 ? (
                 <View style={styles.centerContainer}>
                     <ActivityIndicator size="large" color={COLORS.primary} />
                 </View>
@@ -194,12 +187,11 @@ export default function LocalView() {
                     )}
                     contentContainerStyle={styles.listContent}
                     showsVerticalScrollIndicator={false}
-                    refreshing={vm.isLoading}
+                    refreshing={vm.carregando}
                     onRefresh={vm.listarLocais}
                 />
             )}
 
-            {/* FAB */}
             <TouchableOpacity
                 style={styles.fab}
                 onPress={vm.navegarParaCadastro}

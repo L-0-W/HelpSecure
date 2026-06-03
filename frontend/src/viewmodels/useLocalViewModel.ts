@@ -6,19 +6,19 @@ import { localService } from '../services/localService';
 export function useLocalViewModel() {
     const [telaAtiva, setTelaAtiva] = useState<'lista' | 'cadastro' | 'edicao'>('lista');
     const [locais, setLocais] = useState<Local[]>([]);
-    const [selectedLocal, setSelectedLocal] = useState<Local | null>(null);
+    const [localSelecionado, setLocalSelecionado] = useState<Local | null>(null);
     const [nome, setNome] = useState('');
     const [descricao, setDescricao] = useState('');
-    const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-    const [returnToVisitantes, setReturnToVisitantes] = useState(false);
+    const [carregando, setCarregando] = useState(false);
+    const [erro, setErro] = useState<string | null>(null);
+    const [retornarParaVisitantes, setRetornarParaVisitantes] = useState(false);
 
 
     const navegarParaCadastro = useCallback(() => {
         setNome('');
         setDescricao('');
-        setError(null);
-        setSelectedLocal(null);
+        setErro(null);
+        setLocalSelecionado(null);
         setTelaAtiva('cadastro');
     }, []);
 
@@ -26,52 +26,52 @@ export function useLocalViewModel() {
         const sub = DeviceEventEmitter.addListener('navigate_to_local_form_and_return', () => {
             DeviceEventEmitter.emit('navigate_to_tab', 1); // Muda para aba Locais
             navegarParaCadastro();
-            setReturnToVisitantes(true);
+            setRetornarParaVisitantes(true);
         });
         return () => sub.remove();
     }, [navegarParaCadastro]);
 
     const navegarParaEdicao = useCallback((local: Local) => {
-        setSelectedLocal(local);
+        setLocalSelecionado(local);
         setNome(local.nome);
         setDescricao(local.descricao);
-        setError(null);
+        setErro(null);
         setTelaAtiva('edicao');
     }, []);
 
     const voltarParaLista = useCallback(() => {
         setTelaAtiva('lista');
-        setError(null);
+        setErro(null);
         setNome('');
         setDescricao('');
-        setSelectedLocal(null);
+        setLocalSelecionado(null);
     }, []);
 
     const listarLocais = useCallback(async () => {
-        setIsLoading(true);
-        setError(null);
+        setCarregando(true);
+        setErro(null);
         try {
             const data = await localService.listar();
             setLocais(data);
         } catch (err: any) {
-            setError(err.message || 'Erro ao carregar locais.');
+            setErro(err.message || 'Erro ao carregar locais.');
         } finally {
-            setIsLoading(false);
+            setCarregando(false);
         }
     }, []);
 
     const salvarLocal = useCallback(async () => {
-        if (isLoading) return;
+        if (carregando) return;
         if (!nome.trim() || !descricao.trim()) {
-            setError('Por favor, preencha todos os campos.');
+            setErro('Por favor, preencha todos os campos.');
             return;
         }
 
-        setIsLoading(true);
-        setError(null);
+        setCarregando(true);
+        setErro(null);
         try {
-            if (selectedLocal) {
-                await localService.atualizar(selectedLocal.id, nome, descricao);
+            if (localSelecionado) {
+                await localService.atualizar(localSelecionado.id, nome, descricao);
             } else {
                 await localService.criar(nome, descricao);
             }
@@ -79,39 +79,39 @@ export function useLocalViewModel() {
             DeviceEventEmitter.emit('locais_updated');
             voltarParaLista();
 
-            if (returnToVisitantes) {
+            if (retornarParaVisitantes) {
                 DeviceEventEmitter.emit('navigate_to_tab', 0); // Volta para aba Visitantes
-                setReturnToVisitantes(false);
+                setRetornarParaVisitantes(false);
             }
         } catch (err: any) {
-            setError(err.message || 'Erro de conexão com o servidor.');
+            setErro(err.message || 'Erro de conexão com o servidor.');
         } finally {
-            setIsLoading(false);
+            setCarregando(false);
         }
-    }, [nome, descricao, selectedLocal, listarLocais, voltarParaLista, returnToVisitantes]);
+    }, [nome, descricao, localSelecionado, listarLocais, voltarParaLista, retornarParaVisitantes]);
 
     const deletarLocal = useCallback(async (id: number) => {
-        if (isLoading) return;
-        setIsLoading(true);
-        setError(null);
+        if (carregando) return;
+        setCarregando(true);
+        setErro(null);
         try {
             await localService.deletar(id);
             await listarLocais();
         } catch (err: any) {
             Alert.alert('Erro', err.message || 'Não foi possível excluir o local.');
         } finally {
-            setIsLoading(false);
+            setCarregando(false);
         }
     }, [listarLocais]);
 
     return {
         telaAtiva,
         locais,
-        selectedLocal,
+        localSelecionado,
         nome,
         descricao,
-        isLoading,
-        error,
+        carregando,
+        erro,
         setNome,
         setDescricao,
         navegarParaCadastro,
