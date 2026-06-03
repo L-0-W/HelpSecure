@@ -3,16 +3,16 @@ import { DeviceEventEmitter } from 'react-native';
 import { localService } from '../services/localService';
 import { visitanteService } from '../services/visitanteService';
 
-export function useNovoVisitanteViewModel(selectedVisitante?: any, onSaveSuccess?: () => void) {
-    const [nome, setNome] = useState(selectedVisitante?.nome || '');
-    const [localId, setLocalId] = useState<number | null>(selectedVisitante?.local_id || null);
-    const [validade, setValidade] = useState<string | null>(selectedVisitante?.validade || null);
-    const [fotoUri, setFotoUri] = useState<string | null>(selectedVisitante?.fotoUri || null);
-    const [faceImageBytes, setFaceImageBytes] = useState<number[] | null>(selectedVisitante?.face_image_bytes || null);
+export function useNovoVisitanteViewModel(visitanteSelecionado?: any, aoSalvarComSucesso?: () => void) {
+    const [nome, setNome] = useState(visitanteSelecionado?.nome || '');
+    const [localId, setLocalId] = useState<number | null>(visitanteSelecionado?.local_id || null);
+    const [validade, setValidade] = useState<string | null>(visitanteSelecionado?.validade || null);
+    const [fotoUri, setFotoUri] = useState<string | null>(visitanteSelecionado?.fotoUri || null);
+    const [bytesImagemRosto, setBytesImagemRosto] = useState<number[] | null>(visitanteSelecionado?.face_image_bytes || null);
     
     const [locais, setLocais] = useState<any[]>([]);
-    const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+    const [carregando, setCarregando] = useState(false);
+    const [erro, setErro] = useState<string | null>(null);
 
     const carregarLocais = useCallback(async () => {
         try {
@@ -33,13 +33,13 @@ export function useNovoVisitanteViewModel(selectedVisitante?: any, onSaveSuccess
     }, [carregarLocais]);
 
     const handleSalvar = useCallback(async () => {
-        if (isLoading) return;
+        if (carregando) return;
         if (!nome.trim()) {
-            setError('O nome é obrigatório.');
+            setErro('O nome é obrigatório.');
             return;
         }
         if (!validade) {
-            setError('A validade é obrigatória.');
+            setErro('A validade é obrigatória.');
             return;
         }
 
@@ -63,36 +63,36 @@ export function useNovoVisitanteViewModel(selectedVisitante?: any, onSaveSuccess
         }
 
         if (!localId) {
-            setError('Selecione um local de acesso.');
+            setErro('Selecione um local de acesso.');
             return;
         }
 
-        setIsLoading(true);
-        setError(null);
+        setCarregando(true);
+        setErro(null);
 
         try {
             const payload = {
                 nome: nome.trim(),
                 validade,
                 local_id: localId,
-                face_image_bytes: faceImageBytes || [1, 2, 3, 4], // Array de bytes padrão caso nenhuma foto seja tirada
+                face_image_bytes: bytesImagemRosto || [1, 2, 3, 4],
             };
 
-            if (selectedVisitante) {
-                await visitanteService.atualizar(selectedVisitante.id, payload);
+            if (visitanteSelecionado) {
+                await visitanteService.atualizar(visitanteSelecionado.id, payload);
             } else {
                 await visitanteService.criar(payload);
             }
 
-            if (onSaveSuccess) {
-                onSaveSuccess();
+            if (aoSalvarComSucesso) {
+                aoSalvarComSucesso();
             }
         } catch (err: any) {
-            setError(err.message || 'Erro ao se conectar ao servidor.');
+            setErro(err.message || 'Erro ao se conectar ao servidor.');
         } finally {
-            setIsLoading(false);
+            setCarregando(false);
         }
-    }, [nome, validade, localId, faceImageBytes, selectedVisitante, onSaveSuccess]);
+    }, [nome, validade, localId, bytesImagemRosto, visitanteSelecionado, aoSalvarComSucesso]);
 
     return {
         nome,
@@ -103,11 +103,11 @@ export function useNovoVisitanteViewModel(selectedVisitante?: any, onSaveSuccess
         setValidade,
         fotoUri,
         setFotoUri,
-        faceImageBytes,
-        setFaceImageBytes,
+        bytesImagemRosto,
+        setBytesImagemRosto,
         locais,
-        isLoading,
-        error,
+        carregando,
+        erro,
         handleSalvar,
     };
 }

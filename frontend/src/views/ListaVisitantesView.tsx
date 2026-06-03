@@ -80,14 +80,13 @@ export default function ListaVisitantesView() {
             <NovoVisitanteView
                 visitante={vm.selectedVisitante}
                 onVoltar={vm.voltarParaLista}
-                onSaveSuccess={vm.handleSaveSuccess}
+                aoSalvarComSucesso={vm.handleSaveSuccess}
             />
         );
     }
 
     return (
         <View style={styles.container}>
-            {/* Título e Subtítulo */}
             <View style={styles.titleSection}>
                 <Text style={styles.title}>Visitantes</Text>
                 <Text style={styles.subtitle}>
@@ -95,7 +94,6 @@ export default function ListaVisitantesView() {
                 </Text>
             </View>
 
-            {/* Filtros */}
             <View style={styles.filtrosContainer}>
                 <FiltroButton
                     label="Todos"
@@ -114,7 +112,6 @@ export default function ListaVisitantesView() {
                 />
             </View>
 
-            {/* Loading / List Content */}
             {vm.isLoading && vm.visitantes.length === 0 ? (
                 <View style={styles.centerContainer}>
                     <ActivityIndicator size="large" color={COLORS.primary} />
@@ -156,7 +153,6 @@ export default function ListaVisitantesView() {
                 />
             )}
 
-            {/* FAB */}
             <TouchableOpacity
                 style={styles.fab}
                 onPress={vm.navegarParaCadastro}

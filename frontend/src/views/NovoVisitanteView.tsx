@@ -71,14 +71,14 @@ const base64ToByteArray = (base64String: string): number[] => {
 export default function NovoVisitanteView({
     visitante,
     onVoltar,
-    onSaveSuccess,
+    aoSalvarComSucesso,
 }: {
     visitante?: any;
     onVoltar: () => void;
-    onSaveSuccess?: () => void;
+    aoSalvarComSucesso?: () => void;
 }) {
     const isEditing = !!visitante;
-    const vm = useNovoVisitanteViewModel(visitante, onSaveSuccess || onVoltar);
+    const vm = useNovoVisitanteViewModel(visitante, aoSalvarComSucesso || onVoltar);
 
     const [cameraActive, setCameraActive] = useState(false);
     const [showDatePicker, setShowDatePicker] = useState(false);
@@ -106,7 +106,7 @@ export default function NovoVisitanteView({
                 if (photo && photo.uri && photo.base64) {
                     vm.setFotoUri(photo.uri);
                     const bytes = base64ToByteArray(photo.base64);
-                    vm.setFaceImageBytes(bytes);
+                    vm.setBytesImagemRosto(bytes);
                 }
                 setCameraActive(false);
             } catch (err) {
@@ -176,7 +176,6 @@ export default function NovoVisitanteView({
                 contentContainerStyle={styles.scrollContent}
                 showsVerticalScrollIndicator={false}
             >
-                {/* Título */}
                 <View style={styles.titleSection}>
                     <Text style={styles.title}>
                         {isEditing ? 'Editar Acesso' : 'Novo Visitante'}
@@ -189,15 +188,13 @@ export default function NovoVisitanteView({
                     </Text>
                 </View>
 
-                {/* Feedback de Erro */}
-                {vm.error && (
+                {vm.erro && (
                     <View style={styles.errorBanner}>
                         <Ionicons name="alert-circle-outline" size={18} color={COLORS.danger} />
-                        <Text style={styles.errorText}>{vm.error}</Text>
+                        <Text style={styles.errorText}>{vm.erro}</Text>
                     </View>
                 )}
 
-                {/* Card de Foto */}
                 <View style={styles.fotoCard}>
                     <View style={styles.fotoPlaceholder}>
                         {vm.fotoUri ? (
@@ -222,7 +219,6 @@ export default function NovoVisitanteView({
                     </TouchableOpacity>
                 </View>
 
-                {/* Campo Nome */}
                 <View style={styles.inputSection}>
                     <Text style={styles.label}>Nome Completo</Text>
                     <TextInput
@@ -235,7 +231,6 @@ export default function NovoVisitanteView({
                     />
                 </View>
 
-                {/* Local de Acesso */}
                 <View style={styles.inputSection}>
                     <Text style={styles.label}>Local de Acesso</Text>
                     {vm.locais.length === 0 ? (
@@ -260,7 +255,6 @@ export default function NovoVisitanteView({
                     )}
                 </View>
 
-                {/* Validade do Acesso */}
                 <View style={styles.inputSection}>
                     <View style={styles.validadeHeader}>
                         <MaterialIcons name="timer" size={16} color={COLORS.primary} />
@@ -296,7 +290,6 @@ export default function NovoVisitanteView({
                 </View>
             </ScrollView>
 
-            {/* DatePicker nativo */}
             {showDatePicker && (
                 <DateTimePicker
                     value={isValidadeCustom ? new Date(vm.validade!) : new Date()}
@@ -311,15 +304,14 @@ export default function NovoVisitanteView({
                 />
             )}
 
-            {/* Botões de Ação */}
             <View style={styles.actionsContainer}>
                 <TouchableOpacity
-                    style={[styles.salvarButton, vm.isLoading && { opacity: 0.7 }]}
+                    style={[styles.salvarButton, vm.carregando && { opacity: 0.7 }]}
                     onPress={vm.handleSalvar}
-                    disabled={vm.isLoading}
+                    disabled={vm.carregando}
                     activeOpacity={0.9}
                 >
-                    {vm.isLoading ? (
+                    {vm.carregando ? (
                         <ActivityIndicator size="small" color={COLORS.background} />
                     ) : (
                         <>
@@ -334,7 +326,7 @@ export default function NovoVisitanteView({
                 <TouchableOpacity
                     style={styles.revogarButton}
                     onPress={onVoltar}
-                    disabled={vm.isLoading}
+                    disabled={vm.carregando}
                     activeOpacity={0.8}
                 >
                     <Ionicons name="close-circle-outline" size={18} color={COLORS.danger} />
