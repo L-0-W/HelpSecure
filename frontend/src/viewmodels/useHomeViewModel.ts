@@ -2,26 +2,26 @@ import { useState, useEffect } from 'react';
 import { DeviceEventEmitter } from 'react-native';
 
 export function useHomeViewModel() {
-    const [index, setIndex] = useState(0);
+    const [abaAtiva, setAbaAtiva] = useState(0);
 
-    const handleIndexChange = (newIndex: number) => {
-        setIndex(newIndex);
+    const alterarAba = (novaAba: number) => {
+        setAbaAtiva(novaAba);
 
-        if (newIndex === 0) {
+        if (novaAba === 0) {
             console.log('Carregando dados da Tab 1...');
-        } else if (newIndex === 1) {
+        } else if (novaAba === 1) {
             console.log('Carregando dados da Tab 2...');
         }
     };
     useEffect(() => {
-        const sub = DeviceEventEmitter.addListener('navigate_to_tab', (newIndex: number) => {
-            handleIndexChange(newIndex);
+        const sub = DeviceEventEmitter.addListener('navigate_to_tab', (novaAba: number) => {
+            alterarAba(novaAba);
         });
         return () => sub.remove();
     }, []);
 
     return {
-        index,
-        handleIndexChange,
+        abaAtiva,
+        alterarAba,
     };
 }

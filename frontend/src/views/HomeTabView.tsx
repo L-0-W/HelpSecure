@@ -45,10 +45,10 @@ const renderScene = SceneMap({
 });
 
 export default function HomeTabView() {
-    const { index, handleIndexChange } = useHomeViewModel();
+    const { abaAtiva, alterarAba } = useHomeViewModel();
     const layout = useWindowDimensions();
 
-    const [routes] = React.useState([
+    const [rotas] = React.useState([
         { key: 'visitantes', title: 'Visitantes', icon: 'person' as const },
         { key: 'locais', title: 'Locais', icon: 'place' as const },
         { key: 'cameras', title: 'Câmeras', icon: 'videocam' as const },
@@ -57,7 +57,6 @@ export default function HomeTabView() {
 
     return (
         <View style={{ flex: 1 }}>
-            {/* Header */}
             <View style={styles.header}>
                 <TouchableOpacity style={styles.headerButton}>
                     <Ionicons name="person-outline" size={20} color={COLORS.text} />
@@ -68,17 +67,17 @@ export default function HomeTabView() {
                 </TouchableOpacity>
             </View>
             <TabView
-                navigationState={{ index, routes }}
+                navigationState={{ index: abaAtiva, routes: rotas }}
                 renderScene={renderScene}
-                onIndexChange={handleIndexChange}
+                onIndexChange={alterarAba}
                 initialLayout={{ width: layout.width }}
                 renderTabBar={() => null}
                 swipeEnabled={true}
             />
 
             <CustomTabBar
-                navigationState={{ index, routes }}
-                jumpTo={handleIndexChange}
+                navigationState={{ index: abaAtiva, routes: rotas }}
+                jumpTo={alterarAba}
             />
         </View>
     );
@@ -94,14 +93,14 @@ function CustomTabBar({ navigationState, jumpTo }: { navigationState: any, jumpT
             paddingBottom: 8,
             paddingTop: 4,
         }}>
-            {navigationState.routes.map((route: any, idx: number) => {
-                const isFocused = navigationState.index === idx;
+            {navigationState.routes.map((rota: any, indice: number) => {
+                const estaFocado = navigationState.index === indice;
                 return (
                     <TabBarButton
-                        key={route.key}
-                        onPress={() => jumpTo(idx)}
-                        focused={isFocused}
-                        route={route}
+                        key={rota.key}
+                        onPress={() => jumpTo(indice)}
+                        focado={estaFocado}
+                        rota={rota}
                     />
                 );
             })}
@@ -109,7 +108,7 @@ function CustomTabBar({ navigationState, jumpTo }: { navigationState: any, jumpT
     );
 }
 
-function TabBarButton({ onPress, focused, route }: { onPress: any, focused: boolean, route: any }) {
+function TabBarButton({ onPress, focado, rota }: { onPress: any, focado: boolean, rota: any }) {
     return (
         <TouchableOpacity
             style={{
@@ -123,16 +122,16 @@ function TabBarButton({ onPress, focused, route }: { onPress: any, focused: bool
             activeOpacity={0.7}
         >
             <MaterialIcons
-                name={route.icon}
+                name={rota.icon}
                 size={24}
-                color={focused ? '#00B37E' : '#7C7C8A'}
+                color={focado ? '#00B37E' : '#7C7C8A'}
             />
             <Text style={{
                 marginTop: 4,
-                color: focused ? '#00B37E' : '#7C7C8A',
+                color: focado ? '#00B37E' : '#7C7C8A',
                 fontSize: 12,
             }}>
-                {route.title}
+                {rota.title}
             </Text>
         </TouchableOpacity>
     );
