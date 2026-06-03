@@ -1,6 +1,6 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Local } from '../models/models';
-import { Alert } from 'react-native';
+import { Alert, DeviceEventEmitter } from 'react-native';
 import { localService } from '../services/localService';
 
 export function useLocalViewModel() {
@@ -11,6 +11,8 @@ export function useLocalViewModel() {
     const [descricao, setDescricao] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [returnToVisitantes, setReturnToVisitantes] = useState(false);
+
 
     const navegarParaCadastro = useCallback(() => {
         setNome('');
@@ -19,6 +21,15 @@ export function useLocalViewModel() {
         setSelectedLocal(null);
         setTelaAtiva('cadastro');
     }, []);
+
+    useEffect(() => {
+        const sub = DeviceEventEmitter.addListener('navigate_to_local_form_and_return', () => {
+            DeviceEventEmitter.emit('navigate_to_tab', 1); // Muda para aba Locais
+            navegarParaCadastro();
+            setReturnToVisitantes(true);
+        });
+        return () => sub.remove();
+    }, [navegarParaCadastro]);
 
     const navegarParaEdicao = useCallback((local: Local) => {
         setSelectedLocal(local);
@@ -65,13 +76,19 @@ export function useLocalViewModel() {
                 await localService.criar(nome, descricao);
             }
             await listarLocais();
+            DeviceEventEmitter.emit('locais_updated');
             voltarParaLista();
+
+            if (returnToVisitantes) {
+                DeviceEventEmitter.emit('navigate_to_tab', 0); // Volta para aba Visitantes
+                setReturnToVisitantes(false);
+            }
         } catch (err: any) {
             setError(err.message || 'Erro de conexão com o servidor.');
         } finally {
             setIsLoading(false);
         }
-    }, [nome, descricao, selectedLocal, listarLocais, voltarParaLista]);
+    }, [nome, descricao, selectedLocal, listarLocais, voltarParaLista, returnToVisitantes]);
 
     const deletarLocal = useCallback(async (id: number) => {
         if (isLoading) return;

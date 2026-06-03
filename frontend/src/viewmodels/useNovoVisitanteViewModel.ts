@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
+import { DeviceEventEmitter } from 'react-native';
 import { localService } from '../services/localService';
 import { visitanteService } from '../services/visitanteService';
 
@@ -24,6 +25,11 @@ export function useNovoVisitanteViewModel(selectedVisitante?: any, onSaveSuccess
 
     useEffect(() => {
         carregarLocais();
+        
+        const sub = DeviceEventEmitter.addListener('locais_updated', () => {
+            carregarLocais();
+        });
+        return () => sub.remove();
     }, [carregarLocais]);
 
     const handleSalvar = useCallback(async () => {
@@ -47,8 +53,7 @@ export function useNovoVisitanteViewModel(selectedVisitante?: any, onSaveSuccess
                         { 
                             text: 'Cadastrar Local', 
                             onPress: () => {
-                                // TODO: Implementar navegação para a tela de local
-                                console.log('Navegar para cadastro de local');
+                                DeviceEventEmitter.emit('navigate_to_local_form_and_return');
                             }
                         }
                     ]
