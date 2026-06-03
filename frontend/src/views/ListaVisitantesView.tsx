@@ -78,9 +78,9 @@ export default function ListaVisitantesView() {
     if (vm.telaAtiva === 'cadastro' || vm.telaAtiva === 'edicao') {
         return (
             <NovoVisitanteView
-                visitante={vm.selectedVisitante}
+                visitante={vm.visitanteSelecionado}
                 onVoltar={vm.voltarParaLista}
-                aoSalvarComSucesso={vm.handleSaveSuccess}
+                aoSalvarComSucesso={vm.aoSalvarComSucesso}
             />
         );
     }
@@ -98,21 +98,21 @@ export default function ListaVisitantesView() {
                 <FiltroButton
                     label="Todos"
                     active={vm.filtro === 'todos'}
-                    onPress={() => vm.handleFiltroChange('todos')}
+                    onPress={() => vm.alterarFiltro('todos')}
                 />
                 <FiltroButton
                     label="Ativos"
                     active={vm.filtro === 'ativos'}
-                    onPress={() => vm.handleFiltroChange('ativos')}
+                    onPress={() => vm.alterarFiltro('ativos')}
                 />
                 <FiltroButton
                     label="Expirados"
                     active={vm.filtro === 'expirados'}
-                    onPress={() => vm.handleFiltroChange('expirados')}
+                    onPress={() => vm.alterarFiltro('expirados')}
                 />
             </View>
 
-            {vm.isLoading && vm.visitantes.length === 0 ? (
+            {vm.carregando && vm.visitantes.length === 0 ? (
                 <View style={styles.centerContainer}>
                     <ActivityIndicator size="large" color={COLORS.primary} />
                 </View>
@@ -148,7 +148,7 @@ export default function ListaVisitantesView() {
                     )}
                     contentContainerStyle={styles.listContent}
                     showsVerticalScrollIndicator={false}
-                    refreshing={vm.isLoading}
+                    refreshing={vm.carregando}
                     onRefresh={vm.listarVisitantes}
                 />
             )}

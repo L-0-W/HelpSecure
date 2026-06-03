@@ -7,32 +7,32 @@ type Tela = 'lista' | 'cadastro' | 'edicao';
 export function useListaVisitantesViewModel() {
     const [telaAtiva, setTelaAtiva] = useState<Tela>('lista');
     const [visitantes, setVisitantes] = useState<any[]>([]);
-    const [selectedVisitante, setSelectedVisitante] = useState<any | null>(null);
+    const [visitanteSelecionado, setVisitanteSelecionado] = useState<any | null>(null);
     const [filtro, setFiltro] = useState<'todos' | 'ativos' | 'expirados'>('todos');
-    const [isLoading, setIsLoading] = useState(false);
+    const [carregando, setCarregando] = useState(false);
 
     const navegarParaCadastro = useCallback(() => {
-        setSelectedVisitante(null);
+        setVisitanteSelecionado(null);
         setTelaAtiva('cadastro');
     }, []);
 
     const navegarParaEdicao = useCallback((visitante: any) => {
-        setSelectedVisitante(visitante);
+        setVisitanteSelecionado(visitante);
         setTelaAtiva('edicao');
     }, []);
 
     const voltarParaLista = useCallback(() => {
-        setSelectedVisitante(null);
+        setVisitanteSelecionado(null);
         setTelaAtiva('lista');
     }, []);
 
 
-    const handleFiltroChange = useCallback((novoFiltro: typeof filtro) => {
+    const alterarFiltro = useCallback((novoFiltro: typeof filtro) => {
         setFiltro(novoFiltro);
     }, []);
 
     const listarVisitantes = useCallback(async () => {
-        setIsLoading(true);
+        setCarregando(true);
         try {
             const data = await visitanteService.listar();
             setVisitantes(data);
@@ -40,29 +40,28 @@ export function useListaVisitantesViewModel() {
             console.error('Erro ao listar visitantes:', e);
             setVisitantes([]);
         } finally {
-            setIsLoading(false);
+            setCarregando(false);
         }
     }, []);
 
-    const handleSaveSuccess = useCallback(async () => {
+    const aoSalvarComSucesso = useCallback(async () => {
         await listarVisitantes();
         voltarParaLista();
     }, [listarVisitantes, voltarParaLista]);
 
     const deletarVisitante = useCallback(async (id: number) => {
-        if (isLoading) return;
-        setIsLoading(true);
+        if (carregando) return;
+        setCarregando(true);
         try {
             await visitanteService.deletar(id);
             await listarVisitantes();
         } catch (err: any) {
             Alert.alert('Erro', err.message || 'Não foi possível excluir o visitante.');
         } finally {
-            setIsLoading(false);
+            setCarregando(false);
         }
     }, [listarVisitantes]);
 
-    // Filtragem local
     const visitantesFiltrados = visitantes.filter((v) => {
         const status = v.status || 'ativo';
         if (filtro === 'ativos') return status === 'ativo';
@@ -73,15 +72,15 @@ export function useListaVisitantesViewModel() {
     return {
         telaAtiva,
         visitantes: visitantesFiltrados,
-        selectedVisitante,
+        visitanteSelecionado,
         filtro,
-        isLoading,
+        carregando,
         navegarParaCadastro,
         navegarParaEdicao,
         voltarParaLista,
-        handleFiltroChange,
+        alterarFiltro,
         listarVisitantes,
         deletarVisitante,
-        handleSaveSuccess,
+        aoSalvarComSucesso,
     };
 }
