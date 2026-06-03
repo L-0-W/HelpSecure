@@ -37,6 +37,31 @@ export function useNovoVisitanteViewModel(selectedVisitante?: any, onSaveSuccess
             return;
         }
 
+        if (locais.length === 0) {
+            import('react-native').then(({ Alert }) => {
+                Alert.alert(
+                    'Nenhum Local Cadastrado',
+                    'Para cadastrar um visitante, é necessário existir pelo menos um local. Deseja cadastrar um local agora?',
+                    [
+                        { text: 'Cancelar', style: 'cancel' },
+                        { 
+                            text: 'Cadastrar Local', 
+                            onPress: () => {
+                                // TODO: Implementar navegação para a tela de local
+                                console.log('Navegar para cadastro de local');
+                            }
+                        }
+                    ]
+                );
+            });
+            return;
+        }
+
+        if (!localId) {
+            setError('Selecione um local de acesso.');
+            return;
+        }
+
         setIsLoading(true);
         setError(null);
 
