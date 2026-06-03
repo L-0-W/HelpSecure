@@ -1,4 +1,3 @@
-// src/services/logService.ts
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const WS_BASE_URL = 'wss://api-robotica-movel.onrender.com';

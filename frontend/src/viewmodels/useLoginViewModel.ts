@@ -24,6 +24,7 @@ export const useLoginViewModel = (props?: LoginViewModelProps) => {
   };
 
   const onLogin = async () => {
+    if (isLoading) return;
     setError(null);
     if (!email || !password) {
       setError('Por favor, preencha o email e a senha.');

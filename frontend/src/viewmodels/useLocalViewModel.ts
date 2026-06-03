@@ -50,6 +50,7 @@ export function useLocalViewModel() {
     }, []);
 
     const salvarLocal = useCallback(async () => {
+        if (isLoading) return;
         if (!nome.trim() || !descricao.trim()) {
             setError('Por favor, preencha todos os campos.');
             return;
@@ -73,6 +74,7 @@ export function useLocalViewModel() {
     }, [nome, descricao, selectedLocal, listarLocais, voltarParaLista]);
 
     const deletarLocal = useCallback(async (id: number) => {
+        if (isLoading) return;
         setIsLoading(true);
         setError(null);
         try {

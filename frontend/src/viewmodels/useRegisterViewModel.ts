@@ -32,6 +32,7 @@ export const useRegisterViewModel = (props?: RegisterViewModelProps) => {
   };
 
   const onRegister = async () => {
+    if (isLoading) return;
     setError(null);
     if (!name || !email || !password) {
       setError('Por favor, preencha todos os campos.');

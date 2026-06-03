@@ -27,6 +27,7 @@ export function useNovoVisitanteViewModel(selectedVisitante?: any, onSaveSuccess
     }, [carregarLocais]);
 
     const handleSalvar = useCallback(async () => {
+        if (isLoading) return;
         if (!nome.trim()) {
             setError('O nome é obrigatório.');
             return;

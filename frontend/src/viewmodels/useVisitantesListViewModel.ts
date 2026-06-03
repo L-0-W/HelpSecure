@@ -44,6 +44,7 @@ export function useListaVisitantesViewModel() {
     }, []);
 
     const deletarVisitante = useCallback(async (id: number) => {
+        if (isLoading) return;
         setIsLoading(true);
         try {
             await visitanteService.deletar(id);
