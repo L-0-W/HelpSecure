@@ -26,6 +26,7 @@ export function useListaVisitantesViewModel() {
         setTelaAtiva('lista');
     }, []);
 
+
     const handleFiltroChange = useCallback((novoFiltro: typeof filtro) => {
         setFiltro(novoFiltro);
     }, []);
@@ -42,6 +43,11 @@ export function useListaVisitantesViewModel() {
             setIsLoading(false);
         }
     }, []);
+
+    const handleSaveSuccess = useCallback(async () => {
+        await listarVisitantes();
+        voltarParaLista();
+    }, [listarVisitantes, voltarParaLista]);
 
     const deletarVisitante = useCallback(async (id: number) => {
         if (isLoading) return;
@@ -76,5 +82,6 @@ export function useListaVisitantesViewModel() {
         handleFiltroChange,
         listarVisitantes,
         deletarVisitante,
+        handleSaveSuccess,
     };
 }

@@ -71,12 +71,14 @@ const base64ToByteArray = (base64String: string): number[] => {
 export default function NovoVisitanteView({
     visitante,
     onVoltar,
+    onSaveSuccess,
 }: {
     visitante?: any;
     onVoltar: () => void;
+    onSaveSuccess?: () => void;
 }) {
     const isEditing = !!visitante;
-    const vm = useNovoVisitanteViewModel(visitante, onVoltar);
+    const vm = useNovoVisitanteViewModel(visitante, onSaveSuccess || onVoltar);
 
     const [cameraActive, setCameraActive] = useState(false);
     const [showDatePicker, setShowDatePicker] = useState(false);

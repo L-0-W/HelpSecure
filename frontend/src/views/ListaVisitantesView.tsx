@@ -80,6 +80,7 @@ export default function ListaVisitantesView() {
             <NovoVisitanteView
                 visitante={vm.selectedVisitante}
                 onVoltar={vm.voltarParaLista}
+                onSaveSuccess={vm.handleSaveSuccess}
             />
         );
     }
