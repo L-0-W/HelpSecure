@@ -44,7 +44,7 @@ const renderScene = SceneMap({
     logs: LogsView,
 });
 
-export default function HomeTabView() {
+export default function HomeTabView({ navigateToSettings }: { navigateToSettings?: () => void }) {
     const { abaAtiva, alterarAba } = useHomeViewModel();
     const layout = useWindowDimensions();
 
@@ -62,7 +62,7 @@ export default function HomeTabView() {
                     <Ionicons name="person-outline" size={20} color={COLORS.text} />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>HelpSecure</Text>
-                <TouchableOpacity style={styles.headerButton}>
+                <TouchableOpacity style={styles.headerButton} onPress={navigateToSettings}>
                     <Ionicons name="settings-outline" size={20} color={COLORS.text} />
                 </TouchableOpacity>
             </View>
