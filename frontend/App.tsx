@@ -7,9 +7,10 @@ import { RegisterView } from './src/views/RegisterView';
 import { useLoginViewModel } from './src/viewmodels/useLoginViewModel';
 import { useRegisterViewModel } from './src/viewmodels/useRegisterViewModel';
 import HomeTabView from './src/views/HomeTabView';
+import SettingsView from './src/views/SettingsView';
 
 export default function App() {
-  const [currentScreen, setCurrentScreen] = useState<'login' | 'register' | 'home'>('login');
+  const [currentScreen, setCurrentScreen] = useState<'login' | 'register' | 'home' | 'settings'>('login');
 
   const loginViewModel = useLoginViewModel({
     navigateToRegister: () => setCurrentScreen('register'),
@@ -31,8 +32,13 @@ export default function App() {
             <LoginView {...loginViewModel} />
           ) : currentScreen === 'register' ? (
             <RegisterView {...registerViewModel} />
+          ) : currentScreen === 'settings' ? (
+            <SettingsView 
+              navigateToHome={() => setCurrentScreen('home')} 
+              navigateToLogin={() => setCurrentScreen('login')}
+            />
           ) : (
-            <HomeTabView />
+            <HomeTabView navigateToSettings={() => setCurrentScreen('settings')} />
           )}
         </View>
       </SafeAreaView>
